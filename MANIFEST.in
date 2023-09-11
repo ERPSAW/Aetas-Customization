@@ -1,0 +1,18 @@
+include MANIFEST.in
+include requirements.txt
+include *.json
+include *.md
+include *.py
+include *.txt
+recursive-include aetas_customization *.css
+recursive-include aetas_customization *.csv
+recursive-include aetas_customization *.html
+recursive-include aetas_customization *.ico
+recursive-include aetas_customization *.js
+recursive-include aetas_customization *.json
+recursive-include aetas_customization *.md
+recursive-include aetas_customization *.png
+recursive-include aetas_customization *.py
+recursive-include aetas_customization *.svg
+recursive-include aetas_customization *.txt
+recursive-exclude aetas_customization *.pyc
