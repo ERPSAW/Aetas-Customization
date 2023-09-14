@@ -7,6 +7,17 @@ app_description = "Customization for Aetas"
 app_email = "tailorraj111@gmail.com"
 app_license = "MIT"
 
+
+fixtures = [
+    {"dt": "Custom Field", "filters": [
+        [
+            "name", "in", [
+                "Purchase Invoice Item-mrp","Purchase Invoice Item-margin_custom","Serial No-mrp"
+            ]
+        ]
+    ]}
+]
+
 # Includes in <head>
 # ------------------
 
@@ -30,6 +41,9 @@ app_license = "MIT"
 
 # include js in doctype views
 # doctype_js = {"doctype" : "public/js/doctype.js"}
+doctype_js = {
+    "Purchase Invoice" : "custom_scripts/purchase_invoice.js"
+}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -102,13 +116,14 @@ app_license = "MIT"
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-#	"*": {
-#		"on_update": "method",
-#		"on_cancel": "method",
-#		"on_trash": "method"
-#	}
-# }
+doc_events = {
+	"Purchase Invoice": {
+		"on_submit": "aetas_customization.aetas_customization.overrides.purchase_invoice.on_submit",
+	},
+    "Sales Invoice": {
+		"validate": "aetas_customization.aetas_customization.overrides.sales_invoice.validate",
+	},
+}
 
 # Scheduled Tasks
 # ---------------
