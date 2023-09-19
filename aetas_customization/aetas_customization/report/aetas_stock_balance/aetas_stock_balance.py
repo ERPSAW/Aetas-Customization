@@ -80,6 +80,8 @@ def execute(filters: Optional[StockBalanceFilter] = None):
 				item_reorder_level = item_reorder_detail_map[item + warehouse]["warehouse_reorder_level"]
 				item_reorder_qty = item_reorder_detail_map[item + warehouse]["warehouse_reorder_qty"]
 
+			serial_numbers = filter_serial_numbers(item, warehouse,filters.get("from_date"), filters.get("to_date"))	
+
 			report_data = {
 				"currency": company_currency,
 				"item_code": item,
@@ -87,6 +89,7 @@ def execute(filters: Optional[StockBalanceFilter] = None):
 				"company": company,
 				"reorder_level": item_reorder_level,
 				"reorder_qty": item_reorder_qty,
+				"serial_no": ', '.join(serial_numbers),
 			}
 			report_data.update(item_map[item])
 			report_data.update(qty_dict)
@@ -238,8 +241,8 @@ def get_columns(filters: StockBalanceFilter):
 			{
 				"label": _("Serial No"),
 				"fieldname": "serial_no",
-				"fieldtype":"Data",
-				"width": 100,
+				"fieldtype":"text",
+				"width": 200,
 			},
 		]
 	)
@@ -306,6 +309,7 @@ def get_stock_ledger_entries(filters: StockBalanceFilter, items: List[str]) -> L
 			sle.voucher_no,
 			sle.stock_value,
 			sle.batch_no,
+			sle.serial_no,
 		)
 		.where((sle.docstatus < 2) & (sle.is_cancelled == 0))
 		.orderby(CombineDatetime(sle.posting_date, sle.posting_time))
@@ -520,3 +524,21 @@ def get_variant_values_for(items):
 		attribute_map[attr["parent"]].update({attr["attribute"]: attr["attribute_value"]})
 
 	return attribute_map
+
+
+def filter_serial_numbers(item_code, warehouse,from_date, to_date):
+	filtered_serial_numbers = []
+
+	serial_numbers = frappe.db.sql("""
+    select name
+    from`tabSerial No`
+    where
+	status = 'Active' and warehouse = %(warehouse)s and
+    item_code = %(item_code)s and
+    creation between %(from_date)s and %(to_date)s
+    """,{'item_code':item_code,'warehouse':warehouse,'from_date':from_date,'to_date':to_date},as_dict=1)
+
+	for serial in serial_numbers:
+		filtered_serial_numbers.append(serial.get("name"))
+
+	return filtered_serial_numbers	
