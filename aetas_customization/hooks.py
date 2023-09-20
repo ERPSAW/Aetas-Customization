@@ -12,7 +12,7 @@ fixtures = [
     {"dt": "Custom Field", "filters": [
         [
             "name", "in", [
-                "Purchase Invoice Item-mrp","Purchase Invoice Item-margin_custom","Serial No-mrp"
+                "Purchase Invoice Item-margin_custom","Serial No-mrp"
             ]
         ]
     ]}
