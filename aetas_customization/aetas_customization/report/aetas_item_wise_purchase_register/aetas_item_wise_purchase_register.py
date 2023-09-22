@@ -55,6 +55,14 @@ def _execute(filters=None, additional_table_columns=None, additional_query_colum
 	for d in item_list:
 		item_record = item_details.get(d.item_code)
 
+		serial_number = str(d.serial_no)
+		if serial_number != "None":
+			serial_numbers = serial_number.split()
+			final_serial_numbers = ",".join(serial_numbers) if serial_numbers else "-"
+		else:
+			final_serial_numbers = "-"
+
+
 		purchase_receipt = None
 		if d.purchase_receipt:
 			purchase_receipt = d.purchase_receipt
@@ -94,7 +102,8 @@ def _execute(filters=None, additional_table_columns=None, additional_query_colum
 				"rate": d.base_net_amount / d.stock_qty if d.stock_qty else d.base_net_amount,
 				"amount": d.base_net_amount,
 				"mrp":d.mrp,
-				"margin_custom":d.margin_custom
+				"margin_custom":d.margin_custom,
+				"serial_no":final_serial_numbers if final_serial_numbers is not None else  "-" 
 			}
 		)
 
@@ -290,6 +299,12 @@ def get_columns(additional_table_columns, filters):
 			"fieldtype": "Float",
 			"width": 100,
 		},
+		{
+			"label": _("Serial No"),
+			"fieldname": "serial_no",
+			"fieldtype": "Text",
+			"width": 200,
+		},
 	]
 
 	if filters.get("group_by"):
@@ -345,7 +360,7 @@ def get_items(filters, additional_query_columns):
 			`tabPurchase Invoice Item`.`purchase_receipt`, `tabPurchase Invoice Item`.`po_detail`,
 			`tabPurchase Invoice Item`.`expense_account`, `tabPurchase Invoice Item`.`stock_qty`,
 			`tabPurchase Invoice Item`.`stock_uom`, `tabPurchase Invoice Item`.`base_net_amount`,
-			`tabPurchase Invoice`.`supplier_name`, `tabPurchase Invoice`.`mode_of_payment`,`tabPurchase Invoice Item`.`mrp`,`tabPurchase Invoice Item`.`margin_custom` {0}
+			`tabPurchase Invoice`.`supplier_name`, `tabPurchase Invoice`.`mode_of_payment`,`tabPurchase Invoice Item`.`mrp`,`tabPurchase Invoice Item`.`margin_custom`,`tabPurchase Invoice Item`.`serial_no` {0}
 		from `tabPurchase Invoice`, `tabPurchase Invoice Item`
 		where `tabPurchase Invoice`.name = `tabPurchase Invoice Item`.`parent` and
 		`tabPurchase Invoice`.docstatus = 1 %s

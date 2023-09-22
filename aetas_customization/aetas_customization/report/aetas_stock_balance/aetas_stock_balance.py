@@ -529,16 +529,16 @@ def get_variant_values_for(items):
 def filter_serial_numbers(item_code, warehouse,from_date, to_date):
 	filtered_serial_numbers = []
 
-	serial_numbers = frappe.db.sql("""
-    select name
-    from`tabSerial No`
-    where
-	status = 'Active' and warehouse = %(warehouse)s and
-    item_code = %(item_code)s and
-    creation between %(from_date)s and %(to_date)s
-    """,{'item_code':item_code,'warehouse':warehouse,'from_date':from_date,'to_date':to_date},as_dict=1)
+	serial_nos = frappe.db.get_list(
+    'Serial No',
+    fields=['name'],
+    filters={
+        'creation': ['between', [from_date, to_date]],
+        'item_code': item_code,  
+        'warehouse': warehouse,  
+    })
 
-	for serial in serial_numbers:
-		filtered_serial_numbers.append(serial.get("name"))
+	for serial in serial_nos:
+		filtered_serial_numbers.append(serial.get("name"))	
 
 	return filtered_serial_numbers	
