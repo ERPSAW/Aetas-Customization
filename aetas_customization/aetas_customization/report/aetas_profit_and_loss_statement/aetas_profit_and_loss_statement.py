@@ -14,15 +14,6 @@ from erpnext.accounts.report.financial_statements import (
 
 
 def execute(filters=None):
-	if filters.periodicity != "Yearly":
-		frappe.throw("For Periodicity Only Yearly filter is supported")
-
-	if filters.filter_based_on != "Fiscal Year":
-		frappe.throw("Filter based on Fiscal Year is supported")
-
-	if filters.from_fiscal_year != filters.to_fiscal_year:
-		frappe.throw("From and to Fiscal Year must be same")
-
 	period_list = get_period_list(
 		filters.from_fiscal_year,
 		filters.to_fiscal_year,
@@ -68,50 +59,60 @@ def execute(filters=None):
 			fy_field_in_columns = col.get("fieldname")
 			break
 	data = []
-	cost_center = get_cost_conter(filters)
 
-	for cc in cost_center:
-		filters["cost_center"] = [cc]
-		cc_wise_income = get_data(
-			filters.company,
-			"Income",
-			"Credit",
-			period_list,
-			filters=filters,
-			accumulated_values=filters.accumulated_values,
-			ignore_closing_entries=True,
-			ignore_accumulated_values_for_fy=True,
-		)
+	if filters.periodicity == "Yearly" and filters.filter_based_on == "Fiscal Year" and filters.from_fiscal_year == filters.to_fiscal_year:
+		cost_center = get_cost_conter(filters)
 
-		cc_wise_expense = get_data(
-			filters.company,
-			"Expense",
-			"Debit",
-			period_list,
-			filters=filters,
-			accumulated_values=filters.accumulated_values,
-			ignore_closing_entries=True,
-			ignore_accumulated_values_for_fy=True,
-		)
+		for cc in cost_center:
+			filters["cost_center"] = [cc]
+			cc_wise_income = get_data(
+				filters.company,
+				"Income",
+				"Credit",
+				period_list,
+				filters=filters,
+				accumulated_values=filters.accumulated_values,
+				ignore_closing_entries=True,
+				ignore_accumulated_values_for_fy=True,
+			)
 
-		for cc_income in cc_wise_income:
-			for fy_income in income:
-				if fy_income.get("account") and cc_income.get("account") and fy_income.get("account") == cc_income.get("account"):
-					fy_income[cc.lower().replace(" ","_").replace("-","_")] = cc_income[fy_field_in_columns]
-					break
+			cc_wise_expense = get_data(
+				filters.company,
+				"Expense",
+				"Debit",
+				period_list,
+				filters=filters,
+				accumulated_values=filters.accumulated_values,
+				ignore_closing_entries=True,
+				ignore_accumulated_values_for_fy=True,
+			)
 
-		for cc_expense in cc_wise_expense:
-			for fy_expense in expense:
-				if fy_expense.get("account") and cc_expense.get("account") and fy_expense.get("account") == cc_expense.get("account"):
-					fy_expense[cc.lower().replace(" ","_").replace("-","_")] = cc_expense[fy_field_in_columns]
-					break
+			for cc_income in cc_wise_income:
+				for fy_income in income:
+					if fy_income.get("account") and cc_income.get("account") and fy_income.get("account") == cc_income.get("account"):
+						fy_income[cc.lower().replace(" ","_").replace("-","_")] = cc_income[fy_field_in_columns]
+						break
 
-		cc_net_profit_loss = get_net_profit_loss(
-			cc_wise_income, cc_wise_expense, period_list, filters.company, filters.presentation_currency
-		)
-		net_profit_loss.update({ 
-									cc.lower().replace(" ","_").replace("-","_"): cc_net_profit_loss[fy_field_in_columns]
-		})
+			for cc_expense in cc_wise_expense:
+				for fy_expense in expense:
+					if fy_expense.get("account") and cc_expense.get("account") and fy_expense.get("account") == cc_expense.get("account"):
+						fy_expense[cc.lower().replace(" ","_").replace("-","_")] = cc_expense[fy_field_in_columns]
+						break
+
+			cc_net_profit_loss = get_net_profit_loss(
+				cc_wise_income, cc_wise_expense, period_list, filters.company, filters.presentation_currency
+			)
+			net_profit_loss.update({ 
+										cc.lower().replace(" ","_").replace("-","_"): cc_net_profit_loss[fy_field_in_columns]
+			})
+
+			columns.append({
+						'fieldname': cc.lower().replace(" ","_").replace("-","_"),
+						'label': cc,
+						'fieldtype': 'Currency',
+						'options': 'currency',
+						'width': 150
+			})
 
 	data.extend(income or [])
 	data.extend(expense or [])
@@ -127,14 +128,6 @@ def execute(filters=None):
 		period_list, filters.periodicity, income, expense, net_profit_loss, currency, filters
 	)
 
-	for cc in cost_center:
-		columns.append({
-							'fieldname': cc.lower().replace(" ","_").replace("-","_"),
-							'label': cc,
-							'fieldtype': 'Currency',
-							'options': 'currency',
-							'width': 150
-		})
 	return columns, data, None, chart, report_summary, primitive_summary
 
 
