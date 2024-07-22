@@ -20,6 +20,8 @@ fixtures = [
         [
             "name", "in", [
                 "Customer-mobile_no-reqd","Customer-mobile_no-in_standard_filter"
+                "Purchase Invoice Item-margin_custom","Serial No-mrp",
+                "Payment Reconciliation Invoice-custom_bill_no"
             ]
         ]
     ]}
@@ -49,7 +51,8 @@ fixtures = [
 # include js in doctype views
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 doctype_js = {
-    "Purchase Invoice" : "custom_scripts/purchase_invoice.js"
+    "Purchase Invoice" : "custom_scripts/js/purchase_invoice.js",
+    "Payment Reconciliation" : "custom_scripts/js/payment_reconciliation.js"
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -115,9 +118,9 @@ doctype_js = {
 # ---------------
 # Override standard doctype classes
 
-# override_doctype_class = {
-#	"ToDo": "custom_app.overrides.CustomToDo"
-# }
+override_doctype_class = {
+	"Payment Reconciliation": "aetas_customization.overrides.payment_reconciliation.CustomPaymentReconciliation"
+}
 
 # Document Events
 # ---------------
