@@ -12,6 +12,14 @@ fixtures = [
     {"dt": "Custom Field", "filters": [
         [
             "name", "in", [
+                "Purchase Invoice Item-margin_custom","Serial No-mrp","Customer-custom_source","Sales Invoice-custom_source"
+            ]
+        ]
+    ]},
+     {"dt": "Property Setter", "filters": [
+        [
+            "name", "in", [
+                "Customer-mobile_no-reqd","Customer-mobile_no-in_standard_filter"
                 "Purchase Invoice Item-margin_custom","Serial No-mrp",
                 "Payment Reconciliation Invoice-custom_bill_no"
             ]
