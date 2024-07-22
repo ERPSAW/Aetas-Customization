@@ -11,6 +11,7 @@ from frappe.utils import cint, date_diff, flt, getdate
 from frappe.utils.nestedset import get_descendants_of
 
 import erpnext
+import datetime
 from erpnext.stock.doctype.inventory_dimension.inventory_dimension import get_inventory_dimensions
 from erpnext.stock.doctype.warehouse.warehouse import apply_warehouse_filter
 from erpnext.stock.report.stock_ageing.stock_ageing import FIFOSlots, get_average_age
@@ -80,7 +81,7 @@ def execute(filters: Optional[StockBalanceFilter] = None):
 				item_reorder_level = item_reorder_detail_map[item + warehouse]["warehouse_reorder_level"]
 				item_reorder_qty = item_reorder_detail_map[item + warehouse]["warehouse_reorder_qty"]
 
-			serial_numbers = filter_serial_numbers(item, warehouse,filters.get("from_date"), filters.get("to_date"))	
+			serial_numbers = filter_serial_numbers(item, warehouse, filters.get("to_date"))	
 
 			report_data = {
 				"currency": company_currency,
@@ -526,19 +527,38 @@ def get_variant_values_for(items):
 	return attribute_map
 
 
-def filter_serial_numbers(item_code, warehouse,from_date, to_date):
-	filtered_serial_numbers = []
+def filter_serial_numbers(item_code, warehouse, to_date):
+    filtered_serial_numbers = []
 
-	serial_nos = frappe.db.get_list(
-    'Serial No',
-    fields=['name'],
-    filters={
-        'creation': ['between', [from_date, to_date]],
-        'item_code': item_code,  
-        'warehouse': warehouse,  
-    })
+    # Function to parse date with multiple formats
+    def parse_date(date_str):
+        formats = ['%d-%m-%Y', '%Y-%m-%d']  # Add more formats if needed
+        for fmt in formats:
+            try:
+                return datetime.datetime.strptime(date_str, fmt)
+            except ValueError:
+                continue
+        raise ValueError(f"Date format for '{date_str}' is not recognized.")
 
-	for serial in serial_nos:
-		filtered_serial_numbers.append(serial.get("name"))	
+    if isinstance(to_date, str):
+        to_date = parse_date(to_date)
 
-	return filtered_serial_numbers	
+    to_date = to_date.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+    print(f"Adjusted to_date: {to_date}")
+
+    serial_nos = frappe.db.get_list(
+        'Serial No',
+        fields=['name'],
+        filters={
+            'creation': ['<=', to_date],
+            'item_code': item_code,
+            'warehouse': warehouse,
+            'status': 'Active' 
+        }
+    )
+
+    for serial in serial_nos:
+        filtered_serial_numbers.append(serial.get("name"))
+
+    return filtered_serial_numbers

@@ -103,4 +103,4 @@ frappe.query_reports["Aetas Stock Balance"] = {
 		return value;
 	}
 };
-erpnext.utils.add_inventory_dimensions('Stock Balance', 8);
+erpnext.utils.add_inventory_dimensions('Aetas Stock Balance', 8);

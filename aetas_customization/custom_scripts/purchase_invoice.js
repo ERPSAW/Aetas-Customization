@@ -1,7 +1,13 @@
 frappe.ui.form.on('Purchase Invoice', {
-	refresh(frm) {
-		// your code here
-	},
+	type_of_stocks:function(frm){
+        if(frm.doc.type_of_stocks === "Consignment"){
+              frm.set_value("update_stock",0)
+              frm.refresh_field("update_stock")
+          } else{
+            frm.set_value("update_stock",1)
+            frm.refresh_field("update_stock")
+        }
+      },
     validate: function (frm) {
         frm.doc.items.forEach(function (item) {
             calculateMargin(frm, item.doctype, item.name);
