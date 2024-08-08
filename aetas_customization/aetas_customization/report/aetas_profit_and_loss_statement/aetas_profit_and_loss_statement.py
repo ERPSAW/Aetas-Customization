@@ -78,7 +78,7 @@ def get_cost_center_wise_data(filters, period_list):
 
 	# Retrieve cost centers based on filter or all cost centers for the company
 	cost_centers = get_cost_centers(filters)
-	print("Cost Centers:", cost_centers)
+	# print("Cost Centers:", cost_centers)
 
 	income_data = get_data(
 		filters.company,
@@ -102,15 +102,15 @@ def get_cost_center_wise_data(filters, period_list):
 		ignore_accumulated_values_for_fy=True,
 	)
 
-	print("Initial Income Data:", income_data)
-	print("Initial Expense Data:", expense_data)
+	# print("Initial Income Data:", income_data)
+	# print("Initial Expense Data:", expense_data)
 
 	# Dynamic columns for each cost center to be added to the report
 	cost_center_columns = get_columns(
 	filters.periodicity, period_list, filters.accumulated_values, filters.company
 	)
 
-	print("Initial Cost Center Columns:", cost_center_columns)
+	# print("Initial Cost Center Columns:", cost_center_columns)
 
 	for cc in cost_centers:
 		filters["cost_center"] = [cc]
@@ -138,8 +138,8 @@ def get_cost_center_wise_data(filters, period_list):
 			ignore_accumulated_values_for_fy=True,
 		)
 
-		print("Cost Center Wise Income:", cc_wise_income)
-		print("Cost Center Wise Expense:", cc_wise_expense)
+		# print("Cost Center Wise Income:", cc_wise_income)
+		# print("Cost Center Wise Expense:", cc_wise_expense)
 
 		# Iterate over each period to create a separate column for income and expense
 		for period in period_list:
@@ -158,7 +158,7 @@ def get_cost_center_wise_data(filters, period_list):
 							"width": 200,
 						})
 
-					print("Current Cost Center Columns:", cost_center_columns)
+					# print("Current Cost Center Columns:", cost_center_columns)
 
 					for cc_income in cc_wise_income:
 						for row in income_data:
