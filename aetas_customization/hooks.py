@@ -13,7 +13,7 @@ fixtures = [
         [
             "name", "in", [
                 "Purchase Invoice Item-margin_custom","Serial No-mrp","Customer-custom_source","Sales Invoice-custom_source",
-                "Payment Reconciliation Invoice-custom_bill_no"
+                "Payment Reconciliation Invoice-custom_bill_no","Stock Entry-custom_delivery_note","Stock Entry Detail-custom_mrp"
             ]
         ]
     ]},
