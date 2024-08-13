@@ -13,7 +13,8 @@ fixtures = [
         [
             "name", "in", [
                 "Purchase Invoice Item-margin_custom","Serial No-mrp","Customer-custom_source","Sales Invoice-custom_source",
-                "Payment Reconciliation Invoice-custom_bill_no","Stock Entry-custom_delivery_note","Stock Entry Detail-custom_mrp"
+                "Payment Reconciliation Invoice-custom_bill_no","Stock Entry-custom_delivery_note","Stock Entry Detail-custom_mrp",
+                "Payment Entry-custom_advance_payment_receipt"
             ]
         ]
     ]},
@@ -53,7 +54,8 @@ fixtures = [
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 doctype_js = {
     "Purchase Invoice" : "custom_scripts/js/purchase_invoice.js",
-    "Payment Reconciliation" : "custom_scripts/js/payment_reconciliation.js"
+    "Payment Reconciliation" : "custom_scripts/js/payment_reconciliation.js",
+    "Payment Entry":"custom_scripts/js/payment_entry.js"
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -133,6 +135,9 @@ doc_events = {
 	},
     "Sales Invoice": {
 		"validate": "aetas_customization.aetas_customization.overrides.sales_invoice.validate",
+	},
+    "Payment Entry": {
+		"on_submit": "aetas_customization.aetas_customization.overrides.payment_entry.on_submit",
 	},
 }
 

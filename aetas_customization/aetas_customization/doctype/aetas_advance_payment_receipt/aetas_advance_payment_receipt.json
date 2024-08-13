@@ -8,12 +8,14 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "status",
   "advance_receipt",
   "customer",
   "cost_center",
   "date",
   "paid_amount",
   "column_break_mvql6",
+  "payment_entry",
   "sales_person",
   "remarks",
   "mode_of_payment",
@@ -73,11 +75,25 @@
    "fieldname": "paid_amount",
    "fieldtype": "Float",
    "label": "Paid Amount"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "\nTo Be Received\nReceived"
+  },
+  {
+   "depends_on": "eval:doc.status == \"Received\"",
+   "fieldname": "payment_entry",
+   "fieldtype": "Link",
+   "label": "Payment Entry",
+   "options": "Payment Entry",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-08-12 13:13:26.310436",
+ "modified": "2024-08-13 12:48:34.167562",
  "modified_by": "Administrator",
  "module": "Aetas Customization",
  "name": "Aetas Advance Payment Receipt",
@@ -99,5 +115,14 @@
  ],
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [
+  {
+   "color": "Orange",
+   "title": "To Be Received"
+  },
+  {
+   "color": "Green",
+   "title": "Received"
+  }
+ ]
 }
