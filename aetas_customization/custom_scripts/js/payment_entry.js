@@ -8,5 +8,11 @@ frappe.ui.form.on('Payment Entry', {
                 }
             }
         })
+    },
+    custom_advance_payment_receipt:async function(frm){
+        let amount = await frappe.db.get_value('Aetas Advance Payment Receipt', frm.doc.custom_advance_payment_receipt, 'paid_amount')
+        frm.set_value('paid_amount', amount.message.paid_amount);
+        frm.refresh_field('paid_amount')
+
     }
 })

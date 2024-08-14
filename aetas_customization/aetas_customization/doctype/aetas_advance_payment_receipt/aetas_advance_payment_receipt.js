@@ -13,7 +13,7 @@ frappe.ui.form.on('Aetas Advance Payment Receipt', {
 	},
     onload:function(frm){
         if(frm.doc.payment_entry && frm.doc.status === "Received"){
-            frm.set_df_property('status', 'read_only', 1)
+            frm.set_read_only()
         }
 
     }

@@ -9,7 +9,6 @@
  "engine": "InnoDB",
  "field_order": [
   "status",
-  "advance_receipt",
   "customer",
   "cost_center",
   "date",
@@ -22,11 +21,6 @@
   "utr_no"
  ],
  "fields": [
-  {
-   "fieldname": "advance_receipt",
-   "fieldtype": "Data",
-   "label": "Advance Receipt"
-  },
   {
    "fieldname": "customer",
    "fieldtype": "Link",
@@ -93,7 +87,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-08-13 12:48:34.167562",
+ "modified": "2024-08-14 16:00:47.811015",
  "modified_by": "Administrator",
  "module": "Aetas Customization",
  "name": "Aetas Advance Payment Receipt",
