@@ -148,8 +148,27 @@ def _execute(filters=None, additional_table_columns=None, additional_query_colum
 		add_sub_total_row(total_row, total_row_map, "total_row", tax_columns)
 		data.append(total_row_map.get("total_row"))
 		skip_total_row = 1
+	
+	get_purchase_rate(data)
 
 	return columns, data, None, None, None, skip_total_row
+
+def get_purchase_rate(data):
+	item_codes = [d['item_code'] for d in data if d['item_code'] and d['stock_qty'] == 1]
+
+	if not item_codes:
+		return
+
+	pii_rates = frappe.db.get_all("Purchase Invoice Item",filters={"item_code": ["in", item_codes]},fields=["item_code", "rate"])
+	se_rates = frappe.db.get_all("Stock Entry Detail",filters={"item_code": ["in", item_codes]},fields=["item_code", "basic_rate as rate"])
+
+	pii_rate_map = {d['item_code']: d['rate'] for d in pii_rates}
+	se_rate_map = {d['item_code']: d['rate'] for d in se_rates}
+
+	# Update each item's purchase_rate in the data
+	for d in data:
+		if d['item_code'] and d['stock_qty'] == 1:
+			d['purchase_rate'] = (pii_rate_map.get(d['item_code']) or se_rate_map.get(d['item_code']) or 0)
 
 
 def get_columns(additional_table_columns, filters):
@@ -304,6 +323,13 @@ def get_columns(additional_table_columns, filters):
 			"fieldname": "stock_uom",
 			"fieldtype": "Link",
 			"options": "UOM",
+			"width": 100,
+		},
+		{
+			"label": _("Purchase Rate"),
+			"fieldname": "purchase_rate",
+			"fieldtype": "Float",
+			"options": "currency",
 			"width": 100,
 		},
 		{

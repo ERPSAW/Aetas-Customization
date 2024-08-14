@@ -1,0 +1,122 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "AAPR-.#####",
+ "creation": "2024-08-09 12:13:26.340718",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "status",
+  "customer",
+  "cost_center",
+  "date",
+  "paid_amount",
+  "column_break_mvql6",
+  "payment_entry",
+  "sales_person",
+  "remarks",
+  "mode_of_payment",
+  "utr_no"
+ ],
+ "fields": [
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer"
+  },
+  {
+   "fieldname": "cost_center",
+   "fieldtype": "Link",
+   "label": "Cost Center",
+   "options": "Cost Center"
+  },
+  {
+   "default": "Today",
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "label": "Date"
+  },
+  {
+   "fieldname": "column_break_mvql6",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "sales_person",
+   "fieldtype": "Link",
+   "label": "Sales Person",
+   "options": "Sales Person"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Text",
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "mode_of_payment",
+   "fieldtype": "Link",
+   "label": "Mode Of Payment",
+   "options": "Mode of Payment"
+  },
+  {
+   "fieldname": "utr_no",
+   "fieldtype": "Data",
+   "label": "UTR No"
+  },
+  {
+   "fieldname": "paid_amount",
+   "fieldtype": "Float",
+   "label": "Paid Amount"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "\nTo Be Received\nReceived"
+  },
+  {
+   "depends_on": "eval:doc.status == \"Received\"",
+   "fieldname": "payment_entry",
+   "fieldtype": "Link",
+   "label": "Payment Entry",
+   "options": "Payment Entry",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2024-08-14 16:00:47.811015",
+ "modified_by": "Administrator",
+ "module": "Aetas Customization",
+ "name": "Aetas Advance Payment Receipt",
+ "naming_rule": "Expression (old style)",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [
+  {
+   "color": "Orange",
+   "title": "To Be Received"
+  },
+  {
+   "color": "Green",
+   "title": "Received"
+  }
+ ]
+}
