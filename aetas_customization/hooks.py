@@ -21,7 +21,7 @@ fixtures = [
      {"dt": "Property Setter", "filters": [
         [
             "name", "in", [
-                "Customer-mobile_no-reqd","Customer-mobile_no-in_standard_filter"
+                "Customer-mobile_no-in_standard_filter"
                 "Purchase Invoice Item-margin_custom","Serial No-mrp",
                 "Payment Reconciliation Invoice-custom_bill_no"
             ]
