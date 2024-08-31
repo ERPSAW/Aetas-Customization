@@ -9,13 +9,18 @@
  "engine": "InnoDB",
  "field_order": [
   "supplier",
+  "posting_date",
   "column_break_ppnsu",
   "supplier_address",
   "column_break_jobji",
   "supplier_address_display",
   "section_break_nizz6",
   "items",
-  "amended_from"
+  "total_amount",
+  "amended_from",
+  "section_break_3qey3",
+  "terms",
+  "terms_and_conditions_details"
  ],
  "fields": [
   {
@@ -62,12 +67,38 @@
    "fieldtype": "Table",
    "label": "Items",
    "options": "Aetas Delivery Challan Item"
+  },
+  {
+   "fieldname": "total_amount",
+   "fieldtype": "Currency",
+   "label": "Total Amount"
+  },
+  {
+   "fieldname": "section_break_3qey3",
+   "fieldtype": "Section Break"
+  },
+  {
+   "default": "Today",
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "label": "Posting Date"
+  },
+  {
+   "fieldname": "terms",
+   "fieldtype": "Link",
+   "label": "Terms",
+   "options": "Terms and Conditions"
+  },
+  {
+   "fieldname": "terms_and_conditions_details",
+   "fieldtype": "Text Editor",
+   "label": "Terms and Conditions Details"
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2024-08-22 11:56:09.944780",
+ "modified": "2024-08-23 18:10:29.514622",
  "modified_by": "Administrator",
  "module": "Aetas Customization",
  "name": "Aetas Delivery Challan",
