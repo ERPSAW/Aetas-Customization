@@ -82,6 +82,13 @@ def get_columns(filters):
 			"width": 100
 		},
 		{
+			"label": "Warehouse",
+			"fieldname": "warehouse",
+			"fieldtype": "Link",
+			"options": "Warehouse",
+			"width": 100
+		},
+		{
 			"label": "Available Qty",
 			"fieldname": "available_qty",
 			"fieldtype": "Float",
