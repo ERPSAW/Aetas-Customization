@@ -3,12 +3,12 @@ from erpnext.stock.doctype.serial_no.serial_no import get_auto_serial_nos
 
 def before_validate(self, method):
     try:
-        if self.items:
+        if self.items and self.stock_entry_type == "Material Receipt":
             for item in self.items:
                 dynamic_sn_mapping = frappe.db.get_value("Item", item.item_code, "custom_enable_dynamic_sn_naming")
                 if dynamic_sn_mapping == 1 and not item.serial_no:
                     
-                    store_code = frappe.db.get_value("Warehouse", item.warehouse, "custom_store_code")
+                    store_code = frappe.db.get_value("Warehouse", item.t_warehouse, "custom_store_code")
                     attribute_code2 = frappe.db.get_value("Item Group", item.item_group, "custom_attribute_2")
                     unique_code = frappe.db.get_value("Item Group", item.item_group, "custom_unique_code")
                     attribute_code3 = frappe.db.get_value("Item", item.item_code, "custom_attribute_3")
@@ -16,7 +16,7 @@ def before_validate(self, method):
                     if not all([store_code, attribute_code2, unique_code, attribute_code3]):
                         missing_attributes = []
                         if not store_code:
-                            missing_attributes.append(f"Store Code (Please set <b>Store Code</b> in the Warehouse <b>'{item.warehouse}'</b>)")
+                            missing_attributes.append(f"Store Code (Please set <b>Store Code</b> in the Warehouse <b>'{item.t_warehouse}'</b>)")
                         if not attribute_code2:
                             missing_attributes.append(f"Attribute 2 (Please set <b>Attribute 2</b> in the Item Group <b>'{item.item_group}'</b>)")
                         if not unique_code:
@@ -29,6 +29,7 @@ def before_validate(self, method):
                             f"Missing: {', '.join(missing_attributes)}"
                         )
     
+                    # serial_no_series = f"{store_code}-{attribute_code2}-{unique_code}{attribute_code3}-.####"
                     serial_no_series = f"{store_code}{attribute_code2}{unique_code}{attribute_code3}.###"
                     
                     created_serial_nos = get_auto_serial_nos(serial_no_series, int(item.qty))
@@ -40,21 +41,3 @@ def before_validate(self, method):
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Dynamic Serial No Creation Error")
         raise
-          
-def on_submit(self, method):
-    for item in self.items:
-        if item.serial_no:
-            serial_numbers = item.serial_no.split("\n")
-
-            frappe.db.sql("""
-                UPDATE `tabSerial No`
-                SET mrp = %(mrp)s
-                WHERE name IN %(serial_numbers)s
-                AND item_code = %(item_code)s
-                AND warehouse = %(warehouse)s
-            """, {
-                'mrp': item.mrp,
-                'serial_numbers': serial_numbers,
-                'item_code': item.item_code,
-                'warehouse':item.warehouse
-            })

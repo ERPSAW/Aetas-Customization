@@ -14,7 +14,9 @@ fixtures = [
             "name", "in", [
                 "Purchase Invoice Item-margin_custom","Serial No-mrp","Sales Invoice-custom_source",
                 "Payment Reconciliation Invoice-custom_bill_no","Stock Entry-custom_delivery_note","Stock Entry Detail-custom_mrp",
-                "Payment Entry-custom_advance_payment_receipt","Cost Center-custom_letter_head"
+                "Payment Entry-custom_advance_payment_receipt","Cost Center-custom_letter_head",
+                "Item Group-custom_unique_code","Item Group-custom_attribute_2","Item-custom_enable_dynamic_sn_naming",
+                "Item-custom_attribute_3","Warehouse-custom_store_code"
             ]
         ]
     ]},
@@ -140,6 +142,21 @@ doc_events = {
     "Payment Entry": {
 		"on_submit": "aetas_customization.aetas_customization.overrides.payment_entry.on_submit",
 	},
+    "Purchase Invoice":{
+        "before_validate":"aetas_customization.aetas_customization.overrides.purchase_invoice.before_validate",
+    },
+    "Stock Entry":{
+        "before_validate":"aetas_customization.aetas_customization.overrides.stock_entry.before_validate",
+    },
+    "Item":{
+        "validate": "aetas_customization.aetas_customization.overrides.item.validate",
+    },
+    "Item Group":{
+        "validate": "aetas_customization.aetas_customization.overrides.item_group.validate",
+    },
+    "Warehouse":{
+        "validate": "aetas_customization.aetas_customization.overrides.warehouse.validate",
+    }
 }
 
 # Scheduled Tasks
