@@ -1,19 +1,25 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "ADC-.#####",
+ "autoname": "naming_series:",
  "creation": "2024-08-22 11:53:26.362957",
  "default_view": "List",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "supplier",
+  "naming_series",
   "posting_date",
+  "company_address",
+  "boutique",
+  "boutique_abr",
   "column_break_ppnsu",
+  "supplier",
   "supplier_address",
+  "supplier_ship_to_address",
   "column_break_jobji",
   "supplier_address_display",
+  "supplier_ship_to_address_display",
   "section_break_nizz6",
   "items",
   "total_amount",
@@ -36,7 +42,7 @@
   {
    "fieldname": "supplier_address",
    "fieldtype": "Link",
-   "label": "Supplier Address",
+   "label": "Supplier Bill To Address",
    "options": "Address"
   },
   {
@@ -46,7 +52,7 @@
   {
    "fieldname": "supplier_address_display",
    "fieldtype": "Small Text",
-   "label": "Supplier Address Display",
+   "label": "Supplier Bill To Address Display",
    "read_only": 1
   },
   {
@@ -84,25 +90,65 @@
    "label": "Posting Date"
   },
   {
+   "default": "DC Terms",
    "fieldname": "terms",
    "fieldtype": "Link",
    "label": "Terms",
    "options": "Terms and Conditions"
   },
   {
+   "fetch_from": "terms.terms",
    "fieldname": "terms_and_conditions_details",
    "fieldtype": "Text Editor",
    "label": "Terms and Conditions Details"
+  },
+  {
+   "fieldname": "supplier_ship_to_address",
+   "fieldtype": "Link",
+   "label": "Supplier Ship To Address",
+   "options": "Address"
+  },
+  {
+   "fieldname": "supplier_ship_to_address_display",
+   "fieldtype": "Small Text",
+   "label": "Supplier Ship To Address Display",
+   "read_only": 1
+  },
+  {
+   "fieldname": "company_address",
+   "fieldtype": "Link",
+   "label": "Company Address",
+   "options": "Address"
+  },
+  {
+   "fieldname": "boutique",
+   "fieldtype": "Link",
+   "label": "Boutique",
+   "options": "Boutique"
+  },
+  {
+   "fetch_from": "boutique.custom_boutique_abr",
+   "fieldname": "boutique_abr",
+   "fieldtype": "Data",
+   "label": "Boutique ABR",
+   "read_only": 1
+  },
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Naming Series"
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2024-08-23 18:10:29.514622",
+ "modified": "2025-01-02 14:12:09.896365",
  "modified_by": "Administrator",
  "module": "Aetas Customization",
  "name": "Aetas Delivery Challan",
- "naming_rule": "Expression (old style)",
+ "name_case": "Title Case",
+ "naming_rule": "By \"Naming Series\" field",
  "owner": "Administrator",
  "permissions": [
   {

@@ -1,0 +1,158 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2025-01-02 13:14:15.775531",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "date_of_issue",
+  "column_break_dqbjg",
+  "company_name",
+  "company_address",
+  "column_break_er0wz",
+  "purpose_of_movement",
+  "destination",
+  "boutique_abr",
+  "courier_no",
+  "amended_from",
+  "section_break_syfcr",
+  "sender_or_issuers_details",
+  "column_break_fhnmb",
+  "recipient_details",
+  "section_break_nzzpv",
+  "gp_item",
+  "section_break_v4bng",
+  "remark"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Naming Series"
+  },
+  {
+   "fieldname": "date_of_issue",
+   "fieldtype": "Date",
+   "label": "Date of issue"
+  },
+  {
+   "fieldname": "column_break_dqbjg",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "company_name",
+   "fieldtype": "Data",
+   "label": "Company Name"
+  },
+  {
+   "fieldname": "company_address",
+   "fieldtype": "Small Text",
+   "label": "Company Address"
+  },
+  {
+   "fieldname": "column_break_er0wz",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "purpose_of_movement",
+   "fieldtype": "Data",
+   "label": "Purpose of Movement"
+  },
+  {
+   "fieldname": "destination",
+   "fieldtype": "Link",
+   "label": "Destination",
+   "options": "Boutique"
+  },
+  {
+   "fieldname": "courier_no",
+   "fieldtype": "Data",
+   "label": "Courier No"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "AETAS Gate Pass",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "section_break_syfcr",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "sender_or_issuers_details",
+   "fieldtype": "Small Text",
+   "label": "Sender or Issuer's Details"
+  },
+  {
+   "fieldname": "column_break_fhnmb",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "recipient_details",
+   "fieldtype": "Small Text",
+   "label": "Recipient Details"
+  },
+  {
+   "fieldname": "section_break_nzzpv",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "gp_item",
+   "fieldtype": "Table",
+   "label": "GP Item",
+   "options": "GP Item"
+  },
+  {
+   "fieldname": "section_break_v4bng",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "remark",
+   "fieldtype": "Small Text",
+   "label": "Remark"
+  },
+  {
+   "fetch_from": "destination.custom_boutique_abr",
+   "fieldname": "boutique_abr",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Boutique ABR",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2025-01-02 13:17:19.258981",
+ "modified_by": "Administrator",
+ "module": "Aetas Customization",
+ "name": "AETAS Gate Pass",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

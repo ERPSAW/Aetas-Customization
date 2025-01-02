@@ -7,4 +7,4 @@ from frappe.model.document import Document
 class AetasDeliveryChallan(Document):
 	def validate(self):
 		if self.items:
-			self.total_amount = sum([item.rate for item in self.items])
+			self.total_amount = sum([item.amount for item in self.items])
