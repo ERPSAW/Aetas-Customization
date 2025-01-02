@@ -1,0 +1,179 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2025-01-02 13:25:53.878747",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "company_name",
+  "is_different_trade_name",
+  "trade_name",
+  "column_break_ksw83",
+  "tax_identification_number",
+  "legal_status",
+  "column_break_kaw4f",
+  "cin_number",
+  "gst_number",
+  "pan_number",
+  "business_address_section",
+  "address_line_1",
+  "address_line_2",
+  "column_break_rksqu",
+  "city",
+  "state",
+  "pincode",
+  "bank_details_section",
+  "bank_name",
+  "bank_account_holder_name",
+  "bank_account_number",
+  "ifsc_code"
+ ],
+ "fields": [
+  {
+   "fieldname": "company_name",
+   "fieldtype": "Data",
+   "label": "Company Name"
+  },
+  {
+   "depends_on": "eval:doc.is_different_trade_name == 1",
+   "fieldname": "trade_name",
+   "fieldtype": "Data",
+   "label": "Trade Name"
+  },
+  {
+   "fieldname": "column_break_ksw83",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "tax_identification_number",
+   "fieldtype": "Data",
+   "label": "Tax Identification Number"
+  },
+  {
+   "fieldname": "legal_status",
+   "fieldtype": "Select",
+   "label": "Legal Status",
+   "options": "Good\nNot Good"
+  },
+  {
+   "fieldname": "column_break_kaw4f",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cin_number",
+   "fieldtype": "Data",
+   "label": "CIN Number"
+  },
+  {
+   "fieldname": "gst_number",
+   "fieldtype": "Data",
+   "label": "GST Number",
+   "unique": 1
+  },
+  {
+   "fieldname": "pan_number",
+   "fieldtype": "Data",
+   "label": "PAN Number"
+  },
+  {
+   "fieldname": "business_address_section",
+   "fieldtype": "Section Break",
+   "label": "Business Address"
+  },
+  {
+   "fieldname": "address_line_1",
+   "fieldtype": "Data",
+   "label": "Address Line 1"
+  },
+  {
+   "fieldname": "address_line_2",
+   "fieldtype": "Data",
+   "label": "Address Line 2"
+  },
+  {
+   "fieldname": "column_break_rksqu",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "city",
+   "fieldtype": "Data",
+   "label": "City"
+  },
+  {
+   "fieldname": "state",
+   "fieldtype": "Data",
+   "label": "State"
+  },
+  {
+   "fieldname": "pincode",
+   "fieldtype": "Int",
+   "label": "PINCODE"
+  },
+  {
+   "fieldname": "bank_details_section",
+   "fieldtype": "Section Break",
+   "label": "Bank Details"
+  },
+  {
+   "fieldname": "bank_name",
+   "fieldtype": "Data",
+   "label": "Bank Name"
+  },
+  {
+   "fieldname": "bank_account_holder_name",
+   "fieldtype": "Data",
+   "label": "Bank Account Holder Name"
+  },
+  {
+   "fieldname": "bank_account_number",
+   "fieldtype": "Data",
+   "label": "Bank Account Number",
+   "unique": 1
+  },
+  {
+   "fieldname": "ifsc_code",
+   "fieldtype": "Data",
+   "label": "IFSC Code"
+  },
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Naming Series"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_different_trade_name",
+   "fieldtype": "Check",
+   "label": "Is Different Trade Name"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-01-02 15:46:30.192662",
+ "modified_by": "Administrator",
+ "module": "Aetas Customization",
+ "name": "Vendor Code Creation",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

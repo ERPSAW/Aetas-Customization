@@ -13,6 +13,14 @@ frappe.ui.form.on('Aetas Delivery Challan', {
 			}
 		})
 
+		frm.set_query('company_address', () => {
+			return {
+				filters: {
+					'is_your_company_address':1
+				}
+			}
+		})
+
 		frm.set_query('warehouse', 'items', () => {
 			return {
 				filters: {
@@ -38,6 +46,24 @@ frappe.ui.form.on('Aetas Delivery Challan', {
 		  }
 		  else{
 			  frm.set_value("supplier_address_display", "");
+		  }
+	},
+
+	supplier_ship_to_address:function(frm){
+		if(frm.doc.supplier_ship_to_address){
+			return frm.call({
+			method: "frappe.contacts.doctype.address.address.get_address_display",
+			args: {
+			   "address_dict": frm.doc.supplier_ship_to_address
+			},
+			callback: function(r) {
+			  if(r.message)
+				  frm.set_value("supplier_ship_to_address_display", r.message);
+				}
+		   });
+		  }
+		  else{
+			  frm.set_value("supplier_ship_to_address_display", "");
 		  }
 	}
 });

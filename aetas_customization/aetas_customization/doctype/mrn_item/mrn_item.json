@@ -1,0 +1,61 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-01-02 12:35:23.329577",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "item",
+  "qty_ordered",
+  "qty_received",
+  "uom",
+  "serial_no"
+ ],
+ "fields": [
+  {
+   "fieldname": "item",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Item"
+  },
+  {
+   "fieldname": "qty_ordered",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "QTY Ordered"
+  },
+  {
+   "fieldname": "qty_received",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "QTY Received"
+  },
+  {
+   "fieldname": "uom",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "UOM",
+   "options": "UOM"
+  },
+  {
+   "fieldname": "serial_no",
+   "fieldtype": "Text",
+   "in_list_view": 1,
+   "label": "Serial No"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-01-02 12:51:42.095532",
+ "modified_by": "Administrator",
+ "module": "Aetas Customization",
+ "name": "MRN Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

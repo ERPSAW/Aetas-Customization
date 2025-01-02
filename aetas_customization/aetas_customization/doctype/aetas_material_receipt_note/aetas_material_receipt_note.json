@@ -1,0 +1,140 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2025-01-02 12:50:57.668735",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "date_of_receipt",
+  "type_of_stock",
+  "location",
+  "location_abr",
+  "column_break_2jkna",
+  "supplier_name",
+  "po_number",
+  "column_break_srde3",
+  "courier_no",
+  "section_break_paqfl",
+  "mrn_item",
+  "section_break_rz7az",
+  "remarks",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "date_of_receipt",
+   "fieldtype": "Date",
+   "label": "Date of Receipt"
+  },
+  {
+   "fieldname": "location",
+   "fieldtype": "Link",
+   "label": "Location",
+   "options": "Boutique"
+  },
+  {
+   "fetch_from": "location.custom_boutique_abr",
+   "fieldname": "location_abr",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Location ABR",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_2jkna",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "supplier_name",
+   "fieldtype": "Link",
+   "label": "Supplier Name",
+   "options": "Supplier"
+  },
+  {
+   "fieldname": "po_number",
+   "fieldtype": "Data",
+   "label": "PO Number"
+  },
+  {
+   "fieldname": "column_break_srde3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "courier_no",
+   "fieldtype": "Data",
+   "label": "Courier No"
+  },
+  {
+   "fieldname": "section_break_paqfl",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "mrn_item",
+   "fieldtype": "Table",
+   "label": "MRN Item",
+   "options": "MRN Item"
+  },
+  {
+   "fieldname": "section_break_rz7az",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "AETAS Material Receipt Note",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "default": "Consignment",
+   "fieldname": "type_of_stock",
+   "fieldtype": "Select",
+   "label": "Type of Stock",
+   "options": "Consignment\nOwn Purchase Goods"
+  },
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Naming Series"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2025-01-02 13:16:27.359083",
+ "modified_by": "Administrator",
+ "module": "Aetas Customization",
+ "name": "AETAS Material Receipt Note",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
