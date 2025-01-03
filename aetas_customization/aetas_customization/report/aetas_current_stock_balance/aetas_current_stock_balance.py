@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import frappe
+from datetime import datetime
 
 
 def execute(filters=None):
@@ -34,6 +35,11 @@ def get_data(filters):
 		item_group = item_data.get("item_group", "")
 		stock_uom = item_data.get("stock_uom", "")
 
+		# Calculate stock age
+		creation_date = serial_no.purchase_date
+		today_date = datetime.strptime(frappe.utils.today(), '%Y-%m-%d').date()
+		stock_age = (today_date - creation_date).days
+
 		# Build the row for each serial number
 		row = {
 			"name": serial_no.name,
@@ -45,6 +51,7 @@ def get_data(filters):
 			"available_qty": 1,
 			"purchase_rate": serial_no.purchase_rate,
 			"mrp": mrp,
+			"stock_age": stock_age,
 			"company": serial_no.company
 		}
 		data.append(row)
@@ -104,6 +111,12 @@ def get_columns(filters):
 			"label": "MRP",
 			"fieldname": "mrp",
 			"fieldtype": "Currency",
+			"width": 140
+		},
+		{
+			"label": "Stock Age",
+			"fieldname": "stock_age",
+			"fieldtype": "Int",
 			"width": 140
 		},
 		{
