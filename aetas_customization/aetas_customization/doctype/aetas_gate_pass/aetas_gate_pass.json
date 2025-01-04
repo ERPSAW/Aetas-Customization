@@ -121,7 +121,7 @@
    "label": "Remark"
   },
   {
-   "fetch_from": "destination.custom_boutique_abr",
+   "fetch_from": "destination.boutique_abr",
    "fieldname": "boutique_abr",
    "fieldtype": "Data",
    "hidden": 1,
@@ -132,7 +132,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-01-02 13:17:19.258981",
+ "modified": "2025-01-04 12:11:24.927537",
  "modified_by": "Administrator",
  "module": "Aetas Customization",
  "name": "AETAS Gate Pass",
