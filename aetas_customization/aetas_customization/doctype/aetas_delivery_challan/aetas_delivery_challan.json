@@ -127,7 +127,7 @@
    "options": "Boutique"
   },
   {
-   "fetch_from": "boutique.custom_boutique_abr",
+   "fetch_from": "boutique.boutique_abr",
    "fieldname": "boutique_abr",
    "fieldtype": "Data",
    "label": "Boutique ABR",
@@ -143,7 +143,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-01-02 14:12:09.896365",
+ "modified": "2025-01-04 12:10:36.521003",
  "modified_by": "Administrator",
  "module": "Aetas Customization",
  "name": "Aetas Delivery Challan",
