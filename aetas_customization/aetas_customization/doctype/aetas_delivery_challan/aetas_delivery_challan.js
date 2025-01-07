@@ -65,6 +65,24 @@ frappe.ui.form.on('Aetas Delivery Challan', {
 		  else{
 			  frm.set_value("supplier_ship_to_address_display", "");
 		  }
+	},
+
+	company_address:function(frm){
+		if(frm.doc.company_address){
+			return frm.call({
+				method: "frappe.contacts.doctype.address.address.get_address_display",
+				args: {
+					"address_dict": frm.doc.company_address
+				},
+				callback: function(r) {
+					if(r.message)
+						frm.set_value("company_full_address", r.message);
+					}
+				});
+			}
+		else{
+			frm.set_value("company_full_address", "");
+		}
 	}
 });
 

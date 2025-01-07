@@ -1,5 +1,6 @@
 {
  "actions": [],
+ "allow_import": 1,
  "allow_rename": 1,
  "autoname": "naming_series:",
  "creation": "2025-01-02 12:50:57.668735",
@@ -114,7 +115,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-01-04 12:12:00.400811",
+ "modified": "2025-01-07 18:37:40.684005",
  "modified_by": "Administrator",
  "module": "Aetas Customization",
  "name": "AETAS Material Receipt Note",

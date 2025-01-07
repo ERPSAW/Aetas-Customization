@@ -1,5 +1,6 @@
 {
  "actions": [],
+ "allow_import": 1,
  "allow_rename": 1,
  "autoname": "naming_series:",
  "creation": "2024-08-22 11:53:26.362957",
@@ -10,8 +11,10 @@
  "field_order": [
   "naming_series",
   "posting_date",
-  "company_address",
   "boutique",
+  "company_address",
+  "company_full_address",
+  "company_gst",
   "boutique_abr",
   "column_break_ppnsu",
   "supplier",
@@ -138,12 +141,25 @@
    "fieldtype": "Select",
    "hidden": 1,
    "label": "Naming Series"
+  },
+  {
+   "fieldname": "company_full_address",
+   "fieldtype": "Small Text",
+   "label": "Company Full Address",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "company_address.gstin",
+   "fieldname": "company_gst",
+   "fieldtype": "Data",
+   "label": "Company GST",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-01-04 12:10:36.521003",
+ "modified": "2025-01-07 18:37:25.676940",
  "modified_by": "Administrator",
  "module": "Aetas Customization",
  "name": "Aetas Delivery Challan",
