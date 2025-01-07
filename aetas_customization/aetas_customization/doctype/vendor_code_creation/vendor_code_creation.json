@@ -1,5 +1,6 @@
 {
  "actions": [],
+ "allow_import": 1,
  "allow_rename": 1,
  "autoname": "naming_series:",
  "creation": "2025-01-02 13:25:53.878747",
@@ -57,7 +58,7 @@
    "fieldname": "legal_status",
    "fieldtype": "Select",
    "label": "Legal Status",
-   "options": "Good\nNot Good"
+   "options": "Yes\nNo"
   },
   {
    "fieldname": "column_break_kaw4f",
@@ -153,7 +154,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-01-02 15:46:30.192662",
+ "modified": "2025-01-07 18:37:09.113526",
  "modified_by": "Administrator",
  "module": "Aetas Customization",
  "name": "Vendor Code Creation",

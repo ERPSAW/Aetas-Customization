@@ -9,10 +9,21 @@ def execute(filters=None):
 	columns, data = get_columns(filters), get_data(filters)
 	return columns, data
 
+
 def get_data(filters):
-	data = []
+	data = []	
+
+	if filters.get("from_date") and filters.get("to_date"):
+		from_date = filters.get("from_date")
+		to_date = filters.get("to_date")
+		if from_date > to_date:
+			frappe.throw("From Date cannot be greater than To Date")
 	
-	serial_nos = frappe.db.get_all("Serial No", filters={"status": "Active"}, fields=['*'])
+	if filters.get("from_date") and filters.get("to_date"):
+		filters = {"status": "Active", "purchase_date": ["between", (filters.get("from_date"), filters.get("to_date"))]}
+	else:
+		filters = {"status": "Active"}
+	serial_nos = frappe.db.get_all("Serial No", filters=filters, fields=['*'])
 	if not serial_nos:
 		return data
 	
@@ -42,6 +53,7 @@ def get_data(filters):
 
 		# Build the row for each serial number
 		row = {
+			"creation_date": serial_no.purchase_date,
 			"name": serial_no.name,
 			"item_code": serial_no.item_code,
 			"item_name": serial_no.item_name,
@@ -59,8 +71,15 @@ def get_data(filters):
 	return data
 
 
+
 def get_columns(filters):
 	columns = [
+		{
+			"label": "Creation Date",
+			"fieldname": "creation_date",
+			"fieldtype": "Date",
+			"width": 100
+		},
 		{
 			"label": "Item Code",
 			"fieldname": "item_code",
