@@ -25,6 +25,7 @@
   "supplier_ship_to_address_display",
   "section_break_nizz6",
   "items",
+  "total_qty",
   "total_amount",
   "amended_from",
   "section_break_3qey3",
@@ -80,7 +81,8 @@
   {
    "fieldname": "total_amount",
    "fieldtype": "Currency",
-   "label": "Total Amount"
+   "label": "Total Amount",
+   "read_only": 1
   },
   {
    "fieldname": "section_break_3qey3",
@@ -154,12 +156,18 @@
    "fieldtype": "Data",
    "label": "Company GST",
    "read_only": 1
+  },
+  {
+   "fieldname": "total_qty",
+   "fieldtype": "Float",
+   "label": "Total Qty",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-01-07 18:37:25.676940",
+ "modified": "2025-01-09 12:50:20.196021",
  "modified_by": "Administrator",
  "module": "Aetas Customization",
  "name": "Aetas Delivery Challan",
