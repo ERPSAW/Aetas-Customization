@@ -8,3 +8,4 @@ class AetasDeliveryChallan(Document):
 	def validate(self):
 		if self.items:
 			self.total_amount = sum([item.amount for item in self.items])
+			self.total_qty = sum([item.qty for item in self.items])
