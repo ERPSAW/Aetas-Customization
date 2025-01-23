@@ -58,7 +58,8 @@ doctype_js = {
     "Purchase Invoice" : "custom_scripts/js/purchase_invoice.js",
     "Payment Reconciliation" : "custom_scripts/js/payment_reconciliation.js",
     "Payment Entry":"custom_scripts/js/payment_entry.js",
-    "Sales Invoice":"custom_scripts/js/sales_invoice.js"
+    "Sales Invoice":"custom_scripts/js/sales_invoice.js",
+    "Purchase Order":"custom_scripts/js/purchase_order.js",
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
