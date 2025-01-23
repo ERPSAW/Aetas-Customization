@@ -10,7 +10,8 @@
   "qty",
   "rate",
   "amount",
-  "serial_no"
+  "serial_no",
+  "hsn"
  ],
  "fields": [
   {
@@ -42,12 +43,18 @@
    "fieldtype": "Float",
    "in_list_view": 1,
    "label": "Amount"
+  },
+  {
+   "fieldname": "hsn",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "HSN"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2024-08-23 18:12:08.222643",
+ "modified": "2025-01-23 16:37:05.618884",
  "modified_by": "Administrator",
  "module": "Aetas Customization",
  "name": "Aetas Delivery Challan Item",
