@@ -12,17 +12,15 @@
   "naming_series",
   "date_of_issue",
   "column_break_dqbjg",
-  "company_name",
-  "company_address",
-  "column_break_er0wz",
   "purpose_of_movement",
-  "destination",
   "boutique_abr",
   "courier_no",
   "amended_from",
   "section_break_syfcr",
+  "sender_boutique",
   "sender_or_issuers_details",
   "column_break_fhnmb",
+  "destination",
   "recipient_details",
   "section_break_nzzpv",
   "gp_item",
@@ -42,20 +40,6 @@
   },
   {
    "fieldname": "column_break_dqbjg",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "company_name",
-   "fieldtype": "Data",
-   "label": "Company Name"
-  },
-  {
-   "fieldname": "company_address",
-   "fieldtype": "Small Text",
-   "label": "Company Address"
-  },
-  {
-   "fieldname": "column_break_er0wz",
    "fieldtype": "Column Break"
   },
   {
@@ -122,18 +106,25 @@
    "label": "Remark"
   },
   {
-   "fetch_from": "destination.boutique_abr",
+   "fetch_from": "sender_boutique.boutique_abr",
+   "fetch_if_empty": 1,
    "fieldname": "boutique_abr",
    "fieldtype": "Data",
    "hidden": 1,
    "label": "Boutique ABR",
    "read_only": 1
+  },
+  {
+   "fieldname": "sender_boutique",
+   "fieldtype": "Link",
+   "label": "Sender Boutique",
+   "options": "Boutique"
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-01-07 18:38:01.577314",
+ "modified": "2025-02-04 12:45:46.586669",
  "modified_by": "Administrator",
  "module": "Aetas Customization",
  "name": "AETAS Gate Pass",
