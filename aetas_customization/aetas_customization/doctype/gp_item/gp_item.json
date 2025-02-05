@@ -8,7 +8,8 @@
  "field_order": [
   "item_code",
   "qty",
-  "uom"
+  "uom",
+  "serial_number"
  ],
  "fields": [
   {
@@ -29,12 +30,17 @@
    "in_list_view": 1,
    "label": "UOM",
    "options": "UOM"
+  },
+  {
+   "fieldname": "serial_number",
+   "fieldtype": "Data",
+   "label": "Serial Number"
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-01-02 13:18:24.895414",
+ "modified": "2025-02-05 11:23:15.449027",
  "modified_by": "Administrator",
  "module": "Aetas Customization",
  "name": "GP Item",
