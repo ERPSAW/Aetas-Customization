@@ -13,7 +13,7 @@ frappe.ui.form.on('Purchase Order Item', {
                 args: {
                     item_code: row.item_code
                 },
-                callback: function(r) {   
+                callback: function(r) { 
                     var html = `
                     <style>
                         table {
@@ -38,20 +38,24 @@ frappe.ui.form.on('Purchase Order Item', {
                     <table>
                         <tr>
                             <th>Item Code</th>
-                            <th>Total Balance Quantity</th>
-                        </tr>
+                            <th>Warehouse</th>
+                            <th>Stock</th>
+                        </tr>`;
+                    
+                    r.message.forEach(function(stock) {
+                        html += `
                         <tr>
                             <td>${row.item_code}</td>
-                            <td>${r.message}</td>
-                        </tr>
-                    </table>`;
+                            <td>${stock.warehouse}</td>
+                            <td>${stock.actual_qty}</td>
+                        </tr>`;
+                    });
 
                     html += `</table>`;
                     frappe.msgprint({
                         title: 'Item Stock',
                         message: html
                     });
-
                 }    
             });
         }

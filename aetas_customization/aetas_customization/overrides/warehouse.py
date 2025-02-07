@@ -15,16 +15,14 @@ def get_total_stock(item_code):
         # Fetch all `actual_qty` for the given item_code
         bins = frappe.db.get_all(
             "Bin",
-            filters={"item_code": item_code},
-            fields=["actual_qty"]
+            filters={"item_code": item_code, "actual_qty": (">", 0)},
+            fields=["warehouse","actual_qty"]
         )
         
-        # Calculate the total `actual_qty`
-        total_qty = sum(bin["actual_qty"] for bin in bins)
-        if total_qty <= 0:
-            total_qty= 0
-
-        return total_qty
+        if bins:
+            return bins
+        else:
+            frappe.msgprint(f"No stock available for item {item_code}")
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "Error in get_total_stock")
         frappe.throw(f"An error occurred while fetching stock for item {item_code}: {str(e)}")
