@@ -81,6 +81,7 @@ def _execute(filters=None, additional_table_columns=None):
 			"item_code": d.item_code,
 			"item_name": d.pi_item_name if d.pi_item_name else d.i_item_name,
 			"item_group": d.pi_item_group if d.pi_item_group else d.i_item_group,
+			"warehouse": d.warehouse,
 			"description": d.description,
 			"invoice": d.parent,
 			"posting_date": d.posting_date,
@@ -264,6 +265,13 @@ def get_columns(additional_table_columns, filters):
 			"options": "Account",
 			"width": 100,
 		},
+		{
+			"label": _("Warehouse"),
+			"fieldname": "warehouse",
+			"fieldtype": "Link",
+			"options": "Warehouse",
+			"width": 100,
+		},
 		{"label": _("Stock Qty"), "fieldname": "stock_qty", "fieldtype": "Float", "width": 100},
 		{
 			"label": _("Stock UOM"),
@@ -305,6 +313,7 @@ def get_columns(additional_table_columns, filters):
 			"fieldtype": "Text",
 			"width": 200,
 		},
+		
 	]
 
 	if filters.get("group_by"):
@@ -381,7 +390,8 @@ def get_items(filters, additional_table_columns):
 			pi.mode_of_payment,
 			pii.mrp,
 			pii.margin_custom,
-			pii.serial_no
+			pii.serial_no,
+			pii.warehouse
 		)
 		.where(pi.docstatus == 1)
 		.where(pii.parenttype == doctype)
