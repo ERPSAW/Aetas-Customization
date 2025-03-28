@@ -20,7 +20,12 @@
   "supplier",
   "supplier_address",
   "supplier_ship_to_address",
+  "company",
+  "company_bill_to_address",
+  "company_ship_to_address",
   "column_break_jobji",
+  "company_bill_to_address_display",
+  "company_ship_to_address_display",
   "supplier_address_display",
   "supplier_ship_to_address_display",
   "section_break_nizz6",
@@ -36,8 +41,10 @@
   {
    "fieldname": "supplier",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "Supplier",
-   "options": "Supplier"
+   "options": "Supplier",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_ppnsu",
@@ -46,8 +53,10 @@
   {
    "fieldname": "supplier_address",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "Supplier Bill To Address",
-   "options": "Address"
+   "options": "Address",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_jobji",
@@ -110,8 +119,10 @@
   {
    "fieldname": "supplier_ship_to_address",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "Supplier Ship To Address",
-   "options": "Address"
+   "options": "Address",
+   "read_only": 1
   },
   {
    "fieldname": "supplier_ship_to_address_display",
@@ -162,12 +173,42 @@
    "fieldtype": "Float",
    "label": "Total Qty",
    "read_only": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "fieldname": "company_bill_to_address",
+   "fieldtype": "Link",
+   "label": "Company Bill To Address",
+   "options": "Address"
+  },
+  {
+   "fieldname": "company_ship_to_address",
+   "fieldtype": "Link",
+   "label": "Company Ship To Address",
+   "options": "Address"
+  },
+  {
+   "fieldname": "company_bill_to_address_display",
+   "fieldtype": "Small Text",
+   "label": "Company Bill To Address Display",
+   "read_only": 1
+  },
+  {
+   "fieldname": "company_ship_to_address_display",
+   "fieldtype": "Small Text",
+   "label": "Company Ship To Address Display",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-01-09 12:50:20.196021",
+ "modified": "2025-03-28 16:38:10.902393",
  "modified_by": "Administrator",
  "module": "Aetas Customization",
  "name": "Aetas Delivery Challan",
