@@ -9,6 +9,12 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "section_break_h2pfg",
+  "is_received",
+  "received_by",
+  "column_break_06pi5",
+  "date_of_received",
+  "section_break_khzp5",
   "naming_series",
   "date_of_issue",
   "column_break_dqbjg",
@@ -119,12 +125,46 @@
    "fieldtype": "Link",
    "label": "Sender Boutique",
    "options": "Boutique"
+  },
+  {
+   "fieldname": "section_break_h2pfg",
+   "fieldtype": "Section Break"
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "0",
+   "fieldname": "is_received",
+   "fieldtype": "Check",
+   "label": "Is Received",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "received_by",
+   "fieldtype": "Data",
+   "label": "Received By",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "date_of_received",
+   "fieldtype": "Date",
+   "label": "Date Of Received",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_06pi5",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_khzp5",
+   "fieldtype": "Section Break"
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-02-04 12:45:46.586669",
+ "modified": "2025-04-10 17:23:44.949800",
  "modified_by": "Administrator",
  "module": "Aetas Customization",
  "name": "AETAS Gate Pass",
@@ -133,7 +173,6 @@
  "permissions": [
   {
    "create": 1,
-   "delete": 1,
    "email": 1,
    "export": 1,
    "print": 1,
