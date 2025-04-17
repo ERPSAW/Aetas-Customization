@@ -17,17 +17,22 @@
   "company_gst",
   "boutique_abr",
   "column_break_ppnsu",
-  "supplier",
-  "supplier_address",
-  "supplier_ship_to_address",
   "company",
   "company_bill_to_address",
   "company_ship_to_address",
+  "supplier",
+  "supplier_address",
+  "supplier_ship_to_address",
+  "customer",
+  "customer_bill_to_address",
+  "customer_ship_to_address",
   "column_break_jobji",
   "company_bill_to_address_display",
   "company_ship_to_address_display",
   "supplier_address_display",
   "supplier_ship_to_address_display",
+  "customer_bill_to_address_display",
+  "customer_ship_to_address_display",
   "section_break_nizz6",
   "items",
   "total_qty",
@@ -41,10 +46,8 @@
   {
    "fieldname": "supplier",
    "fieldtype": "Link",
-   "hidden": 1,
-   "label": "Supplier",
-   "options": "Supplier",
-   "read_only": 1
+   "label": "Vendor",
+   "options": "Supplier"
   },
   {
    "fieldname": "column_break_ppnsu",
@@ -53,10 +56,8 @@
   {
    "fieldname": "supplier_address",
    "fieldtype": "Link",
-   "hidden": 1,
-   "label": "Supplier Bill To Address",
-   "options": "Address",
-   "read_only": 1
+   "label": "Vendor Bill To Address",
+   "options": "Address"
   },
   {
    "fieldname": "column_break_jobji",
@@ -119,10 +120,8 @@
   {
    "fieldname": "supplier_ship_to_address",
    "fieldtype": "Link",
-   "hidden": 1,
-   "label": "Supplier Ship To Address",
-   "options": "Address",
-   "read_only": 1
+   "label": "Vendor Ship To Address",
+   "options": "Address"
   },
   {
    "fieldname": "supplier_ship_to_address_display",
@@ -203,12 +202,42 @@
    "fieldtype": "Small Text",
    "label": "Company Ship To Address Display",
    "read_only": 1
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer"
+  },
+  {
+   "fieldname": "customer_bill_to_address",
+   "fieldtype": "Link",
+   "label": "Customer Bill To Address",
+   "options": "Address"
+  },
+  {
+   "fieldname": "customer_ship_to_address",
+   "fieldtype": "Link",
+   "label": "Customer Ship To Address",
+   "options": "Address"
+  },
+  {
+   "fieldname": "customer_bill_to_address_display",
+   "fieldtype": "Small Text",
+   "label": "Customer Bill To Address Display",
+   "read_only": 1
+  },
+  {
+   "fieldname": "customer_ship_to_address_display",
+   "fieldtype": "Small Text",
+   "label": "Customer Ship To Address Display",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-03-28 16:38:10.902393",
+ "modified": "2025-04-17 18:38:27.672774",
  "modified_by": "Administrator",
  "module": "Aetas Customization",
  "name": "Aetas Delivery Challan",
