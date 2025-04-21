@@ -12,14 +12,14 @@ frappe.ui.form.on('Aetas Delivery Challan', {
 				}
 			}
 		})
-		frm.set_query('supplier_ship_to_address', () => {
-			return {
-				filters: {
-					'link_doctype':'Supplier',
-					'link_name': frm.doc.supplier
-				}
-			}
-		})
+		// frm.set_query('supplier_ship_to_address', () => {
+		// 	return {
+		// 		filters: {
+		// 			'link_doctype':'Supplier',
+		// 			'link_name': frm.doc.supplier
+		// 		}
+		// 	}
+		// })
 
 		frm.set_query('customer_bill_to_address', () => {
 			return {
@@ -29,14 +29,14 @@ frappe.ui.form.on('Aetas Delivery Challan', {
 				}
 			}
 		})
-		frm.set_query('customer_ship_to_address', () => {
-			return {
-				filters: {
-					'link_doctype':'Customer',
-					'link_name': frm.doc.customer
-				}
-			}
-		})
+		// frm.set_query('customer_ship_to_address', () => {
+		// 	return {
+		// 		filters: {
+		// 			'link_doctype':'Customer',
+		// 			'link_name': frm.doc.customer
+		// 		}
+		// 	}
+		// })
 
 		frm.set_query('company_address', () => {
 			return {
