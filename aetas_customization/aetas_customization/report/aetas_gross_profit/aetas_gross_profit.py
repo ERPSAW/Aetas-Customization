@@ -42,6 +42,7 @@ def execute(filters=None):
 				"buying_amount",
 				"gross_profit",
 				"gross_profit_percent",
+				"serial_no",
 				"project",
 				"sales_person"
 			],
@@ -297,6 +298,12 @@ def get_columns(group_wise_columns, filters):
 				"fieldtype": "Percent",
 				"width": 100,
 			},
+			"serial_no":{
+				"label":_("Serial No"),
+				"fieldname":"serial_no",
+				"fieldtype":"Data",
+				"width":"100"
+			},
 			"project": {
 				"label": _("Project"),
 				"fieldname": "project",
@@ -399,6 +406,7 @@ def get_column_names():
 			"gross_profit": "gross_profit",
 			"gross_profit_percent": "gross_profit_%",
 			"project": "project",
+			"serial_no":"serial_no",
 			"sales_person":"sales_person"
 		}
 	)
@@ -833,7 +841,8 @@ class GrossProfitGenerator(object):
 				`tabSales Invoice Item`.delivery_note, `tabSales Invoice Item`.stock_qty as qty,
 				`tabSales Invoice Item`.base_net_rate, `tabSales Invoice Item`.base_net_amount,
 				`tabSales Invoice Item`.name as "item_row", `tabSales Invoice`.is_return,
-				`tabSales Invoice Item`.cost_center,`tabSales Invoice Item`.sales_person
+				`tabSales Invoice Item`.cost_center,`tabSales Invoice Item`.sales_person,
+				`tabSales Invoice Item`.serial_no
 				{sales_person_cols}
 				{payment_term_cols}
 			from
