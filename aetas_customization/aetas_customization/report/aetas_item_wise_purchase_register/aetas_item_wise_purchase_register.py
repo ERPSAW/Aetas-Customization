@@ -10,7 +10,8 @@ import erpnext
 from erpnext.accounts.report.item_wise_sales_register.item_wise_sales_register import (
 	add_sub_total_row,
 	add_total_row,
-	apply_group_by_conditions,
+	# apply_group_by_conditions,
+	apply_order_by_conditions,
 	get_grand_total,
 	get_group_by_and_display_fields,
 	get_tax_accounts,
@@ -345,7 +346,8 @@ def apply_conditions(query, pi, pii, filters):
 		query = query.orderby(pi.posting_date, order=Order.desc)
 		query = query.orderby(pii.item_group, order=Order.desc)
 	else:
-		query = apply_group_by_conditions(query, pi, pii, filters)
+		# query = apply_group_by_conditions(query, pi, pii, filters)
+		query = apply_order_by_conditions(query, pi, pii, filters)
 
 	return query
 
