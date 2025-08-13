@@ -11,9 +11,9 @@ def before_validate(self, method):
                     store_code = frappe.db.get_value("Warehouse", item.warehouse, "custom_store_code")
                     attribute_code2 = frappe.db.get_value("Item Group", item.item_group, "custom_attribute_2")
                     unique_code = frappe.db.get_value("Item Group", item.item_group, "custom_unique_code")
-                    attribute_code3 = frappe.db.get_value("Item", item.item_code, "custom_attribute_3")
+                    # attribute_code3 = frappe.db.get_value("Item", item.item_code, "custom_attribute_3")
 
-                    if not all([store_code, attribute_code2, unique_code, attribute_code3]):
+                    if not all([store_code, attribute_code2, unique_code]):
                         missing_attributes = []
                         if not store_code:
                             missing_attributes.append(f"Store Code (Please set <b>Store Code</b> in the Warehouse <b>'{item.warehouse}'</b>)")
@@ -21,15 +21,16 @@ def before_validate(self, method):
                             missing_attributes.append(f"Attribute 2 (Please set <b>Attribute 2</b> in the Item Group <b>'{item.item_group}'</b>)")
                         if not unique_code:
                             missing_attributes.append(f"Unique Code (Please set <b>Unique Code</b> in the Item Group <b>'{item.item_group}'</b>)")
-                        if not attribute_code3:
-                            missing_attributes.append(f"Attribute 3 (Please set <b>Attribute 3</b> in the Item <b>'{item.item_code}'</b>)")
+                        # if not attribute_code3:
+                        #     missing_attributes.append(f"Attribute 3 (Please set <b>Attribute 3</b> in the Item <b>'{item.item_code}'</b>)")
                         
                         frappe.throw(
                             f"Missing required attributes for serial number generation for Item: {item.item_code}. "
                             f"Missing: {', '.join(missing_attributes)}"
                         )
     
-                    serial_no_series = f"{store_code}{attribute_code2}{unique_code}{attribute_code3}.###"
+                    # serial_no_series = f"{store_code}{attribute_code2}{unique_code}{attribute_code3}.###"
+                    serial_no_series = f"{store_code}{attribute_code2}{unique_code}.###"
                     
                     created_serial_nos = get_auto_serial_nos(serial_no_series, int(item.qty))
                     if created_serial_nos:
