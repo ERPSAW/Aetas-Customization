@@ -16,7 +16,8 @@ fixtures = [
                 "Payment Reconciliation Invoice-custom_bill_no","Stock Entry-custom_delivery_note","Stock Entry Detail-custom_mrp",
                 "Payment Entry-custom_advance_payment_receipt","Cost Center-custom_letter_head",
                 "Item Group-custom_unique_code","Item Group-custom_attribute_2","Item-custom_enable_dynamic_sn_naming",
-                "Item-custom_attribute_3","Warehouse-custom_store_code"
+                "Item-custom_attribute_3","Warehouse-custom_store_code",
+                "Sales Invoice-custom_aetas_coupon_code"
             ]
         ]
     ]},
@@ -139,6 +140,8 @@ doc_events = {
 	},
     "Sales Invoice": {
 		"validate": "aetas_customization.aetas_customization.overrides.sales_invoice.validate",
+		"on_submit": "aetas_customization.aetas_customization.overrides.sales_invoice.on_submit",
+		"on_cancel": "aetas_customization.aetas_customization.overrides.sales_invoice.on_cancel",
 	},
     "Payment Entry": {
 		"on_submit": "aetas_customization.aetas_customization.overrides.payment_entry.on_submit",
