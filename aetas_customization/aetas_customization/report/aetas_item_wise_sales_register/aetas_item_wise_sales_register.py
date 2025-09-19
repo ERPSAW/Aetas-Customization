@@ -159,7 +159,8 @@ def get_purchase_rate(data):
 	if not item_codes:
 		return
 
-	pii_rates = frappe.db.get_all("Purchase Invoice Item",filters={"item_code": ["in", item_codes]},fields=["item_code", "rate"])
+	# pii_rates = frappe.db.get_all("Purchase Invoice Item",filters={"item_code": ["in", item_codes]},fields=["item_code", "rate"])
+	pii_rates = frappe.db.get_all("Purchase Invoice Item",filters={"item_code": ["in", item_codes]},fields=["item_code", "net_rate as rate"])
 	se_rates = frappe.db.get_all("Stock Entry Detail",filters={"item_code": ["in", item_codes]},fields=["item_code", "basic_rate as rate"])
 
 	pii_rate_map = {d['item_code']: d['rate'] for d in pii_rates}
