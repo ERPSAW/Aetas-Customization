@@ -14,10 +14,12 @@ def validate(self,method):
         coupon_data = validate_coupon_code(self.custom_aetas_coupon_code , json.dumps(list(map(lambda x: { "item_code" : x.item_code , "base_amount" : x.base_amount} , self.items))), total)
         if coupon_data.get("status") == "Valid":
             self.discount_amount = coupon_data.get("total_discount", 0.0)
+            self.apply_discount_on = "Grand Total"
             frappe.msgprint(f"Coupon code applied , Amount: {frappe.format_value(coupon_data.get('total_discount', 0.0), dict(fieldtype='Currency'))}")
         else:
             self.custom_aetas_coupon_code = None
             self.discount_amount = 0.0
+            self.apply_discount_on = "Grand Total"
             frappe.msgprint(f"Coupon code not applicable, Reason: {coupon_data.get('message')}")
         self.calculate_taxes_and_totals()
 
