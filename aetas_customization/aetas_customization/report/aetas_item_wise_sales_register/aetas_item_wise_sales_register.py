@@ -153,23 +153,59 @@ def _execute(filters=None, additional_table_columns=None, additional_query_colum
 
 	return columns, data, None, None, None, skip_total_row
 
+# def get_purchase_rate(data):
+# 	frappe.log_error("get_purchase_rate",str(data))
+# 	item_codes = [d['item_code'] for d in data if d['item_code'] and d['stock_qty'] == 1]
+
+# 	if not item_codes:
+# 		return
+
+# 	# pii_rates = frappe.db.get_all("Purchase Invoice Item",filters={"item_code": ["in", item_codes]},fields=["item_code", "rate"])
+# 	pii_rates = frappe.db.get_all("Purchase Invoice Item",filters={"item_code": ["in", item_codes]},fields=["item_code", "net_rate as rate"])
+# 	se_rates = frappe.db.get_all("Stock Entry Detail",filters={"item_code": ["in", item_codes]},fields=["item_code", "basic_rate as rate"])
+
+# 	pii_rate_map = {d['item_code']: d['rate'] for d in pii_rates}
+# 	se_rate_map = {d['item_code']: d['rate'] for d in se_rates}
+
+# 	# Update each item's purchase_rate in the data
+# 	for d in data:
+# 		if d['item_code'] and d['stock_qty'] == 1:
+# 			d['purchase_rate'] = (pii_rate_map.get(d['item_code']) or se_rate_map.get(d['item_code']) or 0)
+
 def get_purchase_rate(data):
-	item_codes = [d['item_code'] for d in data if d['item_code'] and d['stock_qty'] == 1]
+	frappe.log_error("get_purchase_rate", str(data))
+
+	# Collect all item codes that exist in the data
+	item_codes = [d['item_code'] for d in data if d.get('item_code')]
 
 	if not item_codes:
 		return
 
-	# pii_rates = frappe.db.get_all("Purchase Invoice Item",filters={"item_code": ["in", item_codes]},fields=["item_code", "rate"])
-	pii_rates = frappe.db.get_all("Purchase Invoice Item",filters={"item_code": ["in", item_codes]},fields=["item_code", "net_rate as rate"])
-	se_rates = frappe.db.get_all("Stock Entry Detail",filters={"item_code": ["in", item_codes]},fields=["item_code", "basic_rate as rate"])
+	# Fetch rates from Purchase Invoice Item and Stock Entry Detail
+	pii_rates = frappe.db.get_all(
+		"Purchase Invoice Item",
+		filters={"item_code": ["in", item_codes]},
+		fields=["item_code", "net_rate as rate"]
+	)
+	se_rates = frappe.db.get_all(
+		"Stock Entry Detail",
+		filters={"item_code": ["in", item_codes]},
+		fields=["item_code", "basic_rate as rate"]
+	)
 
+	# Create rate maps
 	pii_rate_map = {d['item_code']: d['rate'] for d in pii_rates}
 	se_rate_map = {d['item_code']: d['rate'] for d in se_rates}
 
-	# Update each item's purchase_rate in the data
+	# Assign purchase rate regardless of stock_qty
 	for d in data:
-		if d['item_code'] and d['stock_qty'] == 1:
-			d['purchase_rate'] = (pii_rate_map.get(d['item_code']) or se_rate_map.get(d['item_code']) or 0)
+		if d.get('item_code'):
+			d['purchase_rate'] = (
+				pii_rate_map.get(d['item_code'])
+				or se_rate_map.get(d['item_code'])
+				or 0
+			)
+
 
 
 def get_columns(additional_table_columns, filters):
