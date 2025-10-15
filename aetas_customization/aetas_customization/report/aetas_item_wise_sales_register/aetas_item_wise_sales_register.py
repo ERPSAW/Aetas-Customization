@@ -178,8 +178,9 @@ def get_purchase_rate(data):
 		fields=["item_code", "serial_no", "basic_rate as rate"]
 	)
 
-	# Prepare lookup maps
-	pii_rate_map = {}
+	# --- Prepare lookup maps ---
+	pii_rate_map, se_rate_map = {}, {}
+
 	for d in pii_rates:
 		if d.get("serial_no"):
 			for sn in [s.strip() for s in d["serial_no"].split("\n") if s.strip()]:
@@ -187,7 +188,6 @@ def get_purchase_rate(data):
 		else:
 			pii_rate_map[d["item_code"]] = d["rate"]
 
-	se_rate_map = {}
 	for d in se_rates:
 		if d.get("serial_no"):
 			for sn in [s.strip() for s in d["serial_no"].split("\n") if s.strip()]:
@@ -195,49 +195,60 @@ def get_purchase_rate(data):
 		else:
 			se_rate_map[d["item_code"]] = d["rate"]
 
-	# --- Fetch latest SLE rates for non-serialized items ---
-	sle_data = frappe.db.sql("""
-		SELECT 
-			item_code,
-			CASE 
-				WHEN valuation_rate > 0 THEN valuation_rate
-				WHEN incoming_rate > 0 THEN incoming_rate
-				ELSE 0
-			END AS rate
-		FROM `tabStock Ledger Entry`
-		WHERE item_code IN %(items)s
-			AND voucher_type = 'Purchase Invoice'
-			AND (valuation_rate > 0 OR incoming_rate > 0)
-		ORDER BY posting_date DESC, posting_time DESC
-	""", {"items": item_codes}, as_dict=True)
+	# --- Collect all (invoice, item_code) pairs for SLE query ---
+	invoice_item_pairs = [(d["invoice"], d["item_code"]) for d in data if d.get("invoice") and d.get("item_code")]
+	invoices = list({inv for inv, _ in invoice_item_pairs})
 
+	# --- Fetch SLE rates for specific (invoice, item_code) pairs ---
 	sle_rate_map = {}
-	for row in sle_data:
-		if row["item_code"] not in sle_rate_map:
-			sle_rate_map[row["item_code"]] = row["rate"]
+	if invoices:
+		sle_data = frappe.db.sql("""
+			SELECT 
+				item_code,
+				voucher_no,
+				CASE 
+					WHEN valuation_rate > 0 THEN valuation_rate
+					WHEN incoming_rate > 0 THEN incoming_rate
+					ELSE 0
+				END AS rate
+			FROM `tabStock Ledger Entry`
+			WHERE voucher_type = 'Sales Invoice'
+				AND voucher_no IN %(invoices)s
+				AND item_code IN %(items)s
+				AND (valuation_rate > 0 OR incoming_rate > 0)
+			ORDER BY posting_date DESC, posting_time DESC
+		""", {"invoices": invoices, "items": item_codes}, as_dict=True)
 
-	# --- Assign purchase rate based on serial number existence ---
+		for row in sle_data:
+			key = (row["voucher_no"], row["item_code"])
+			if key not in sle_rate_map:  # only latest per (invoice, item_code)
+				sle_rate_map[key] = row["rate"]
+
+	# --- Assign purchase rate per row ---
 	for d in data:
 		item_code = d.get("item_code")
 		if not item_code:
 			continue
 
+		invoice = d.get("invoice")
 		serial_no = d.get("serial_no")
 
 		if serial_no:
-			# Try to find by serial_no first
+			# Serialized item: prefer serial_no rate
 			d["purchase_rate"] = (
 				pii_rate_map.get(serial_no)
 				or se_rate_map.get(serial_no)
 				or pii_rate_map.get(item_code)
 				or se_rate_map.get(item_code)
+				or sle_rate_map.get((invoice, item_code))
 				or 0
 			)
 		else:
-			# Non-serialized: use latest Stock Ledger Entry rate
-			d["purchase_rate"] = sle_rate_map.get(item_code) or 0
+			# Non-serialized: use SLE by (invoice, item_code)
+			d["purchase_rate"] = sle_rate_map.get((invoice, item_code)) or 0
 
 	return data
+
 
 def get_customer_type(data):
 	if not data:
