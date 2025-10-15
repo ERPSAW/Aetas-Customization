@@ -60,6 +60,12 @@ frappe.query_reports["Aetas Item Wise Sales Register"] = {
 			"fieldname": "group_by",
 			"fieldtype": "Select",
 			"options": ["Customer Group", "Customer", "Item Group", "Item", "Territory", "Invoice"]
+		},
+		{
+			"label": __("Customer Type"),
+			"fieldname": "customer_type",
+			"fieldtype": "Select",
+			"options": ["", "New", "Repeated",]
 		}
 	],
 	"formatter": function(value, row, column, data, default_formatter) {

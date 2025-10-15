@@ -150,61 +150,123 @@ def _execute(filters=None, additional_table_columns=None, additional_query_colum
 		skip_total_row = 1
 	
 	get_purchase_rate(data)
+	get_customer_type(data)
+
+	customer_type_filter = filters.get("customer_type")
+	if customer_type_filter:
+		data = [d for d in data if d.get("customer_type") == customer_type_filter]
 
 	return columns, data, None, None, None, skip_total_row
 
-# def get_purchase_rate(data):
-# 	frappe.log_error("get_purchase_rate",str(data))
-# 	item_codes = [d['item_code'] for d in data if d['item_code'] and d['stock_qty'] == 1]
-
-# 	if not item_codes:
-# 		return
-
-# 	# pii_rates = frappe.db.get_all("Purchase Invoice Item",filters={"item_code": ["in", item_codes]},fields=["item_code", "rate"])
-# 	pii_rates = frappe.db.get_all("Purchase Invoice Item",filters={"item_code": ["in", item_codes]},fields=["item_code", "net_rate as rate"])
-# 	se_rates = frappe.db.get_all("Stock Entry Detail",filters={"item_code": ["in", item_codes]},fields=["item_code", "basic_rate as rate"])
-
-# 	pii_rate_map = {d['item_code']: d['rate'] for d in pii_rates}
-# 	se_rate_map = {d['item_code']: d['rate'] for d in se_rates}
-
-# 	# Update each item's purchase_rate in the data
-# 	for d in data:
-# 		if d['item_code'] and d['stock_qty'] == 1:
-# 			d['purchase_rate'] = (pii_rate_map.get(d['item_code']) or se_rate_map.get(d['item_code']) or 0)
-
 def get_purchase_rate(data):
-	frappe.log_error("get_purchase_rate", str(data))
+	if not data:
+		return data
 
-	# Collect all item codes that exist in the data
-	item_codes = [d['item_code'] for d in data if d.get('item_code')]
-
+	item_codes = list({d['item_code'] for d in data if d.get('item_code')})
 	if not item_codes:
-		return
+		return data
 
-	# Fetch rates from Purchase Invoice Item and Stock Entry Detail
+	# --- Fetch purchase rates from Purchase Invoice and Stock Entry ---
 	pii_rates = frappe.db.get_all(
 		"Purchase Invoice Item",
 		filters={"item_code": ["in", item_codes]},
-		fields=["item_code", "net_rate as rate"]
+		fields=["item_code", "serial_no", "net_rate as rate"]
 	)
 	se_rates = frappe.db.get_all(
 		"Stock Entry Detail",
 		filters={"item_code": ["in", item_codes]},
-		fields=["item_code", "basic_rate as rate"]
+		fields=["item_code", "serial_no", "basic_rate as rate"]
 	)
 
-	# Create rate maps
-	pii_rate_map = {d['item_code']: d['rate'] for d in pii_rates}
-	se_rate_map = {d['item_code']: d['rate'] for d in se_rates}
+	# Prepare lookup maps
+	pii_rate_map = {}
+	for d in pii_rates:
+		if d.get("serial_no"):
+			for sn in [s.strip() for s in d["serial_no"].split("\n") if s.strip()]:
+				pii_rate_map[sn] = d["rate"]
+		else:
+			pii_rate_map[d["item_code"]] = d["rate"]
 
-	# Assign purchase rate regardless of stock_qty
+	se_rate_map = {}
+	for d in se_rates:
+		if d.get("serial_no"):
+			for sn in [s.strip() for s in d["serial_no"].split("\n") if s.strip()]:
+				se_rate_map[sn] = d["rate"]
+		else:
+			se_rate_map[d["item_code"]] = d["rate"]
+
+	# --- Fetch latest SLE rates for non-serialized items ---
+	sle_data = frappe.db.sql("""
+		SELECT 
+			item_code,
+			CASE 
+				WHEN valuation_rate > 0 THEN valuation_rate
+				WHEN incoming_rate > 0 THEN incoming_rate
+				ELSE 0
+			END AS rate
+		FROM `tabStock Ledger Entry`
+		WHERE item_code IN %(items)s
+			AND voucher_type = 'Purchase Invoice'
+			AND (valuation_rate > 0 OR incoming_rate > 0)
+		ORDER BY posting_date DESC, posting_time DESC
+	""", {"items": item_codes}, as_dict=True)
+
+	sle_rate_map = {}
+	for row in sle_data:
+		if row["item_code"] not in sle_rate_map:
+			sle_rate_map[row["item_code"]] = row["rate"]
+
+	# --- Assign purchase rate based on serial number existence ---
 	for d in data:
-		if d.get('item_code'):
-			d['purchase_rate'] = (
-				pii_rate_map.get(d['item_code'])
-				or se_rate_map.get(d['item_code'])
+		item_code = d.get("item_code")
+		if not item_code:
+			continue
+
+		serial_no = d.get("serial_no")
+
+		if serial_no:
+			# Try to find by serial_no first
+			d["purchase_rate"] = (
+				pii_rate_map.get(serial_no)
+				or se_rate_map.get(serial_no)
+				or pii_rate_map.get(item_code)
+				or se_rate_map.get(item_code)
 				or 0
 			)
+		else:
+			# Non-serialized: use latest Stock Ledger Entry rate
+			d["purchase_rate"] = sle_rate_map.get(item_code) or 0
+
+	return data
+
+def get_customer_type(data):
+	if not data:
+		return data
+
+	customers = list({d['customer'] for d in data if d.get('customer')})
+	if not customers:
+		return data
+
+	# Get invoice counts for all customers at once
+	invoice_counts = frappe.db.get_all(
+		"Sales Invoice",
+		filters={"customer": ["in", customers]},
+		fields=["customer", "count(name) as invoice_count"],
+		group_by="customer"
+	)
+
+	# Convert list of dicts into {customer: count}
+	invoice_count_map = {d["customer"]: d["invoice_count"] for d in invoice_counts}
+
+	# Add customer_type to each record
+	for d in data:
+		customer = d.get("customer")
+		if not customer:
+			continue
+		count = invoice_count_map.get(customer, 0)
+		d["customer_type"] = "Repeated" if count > 1 else "New"
+
+	return data
 
 
 
@@ -360,6 +422,12 @@ def get_columns(additional_table_columns, filters):
 			"fieldname": "stock_uom",
 			"fieldtype": "Link",
 			"options": "UOM",
+			"width": 100,
+		},
+		{
+			"label": _("Customer Type"),
+			"fieldname": "customer_type",
+			"fieldtype": "Data",
 			"width": 100,
 		},
 		{
