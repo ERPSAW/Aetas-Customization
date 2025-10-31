@@ -13,7 +13,6 @@ from erpnext.selling.report.item_wise_sales_history.item_wise_sales_history impo
 	get_item_details,
 )
 
-
 def execute(filters=None):
 	return _execute(filters)
 
@@ -70,6 +69,20 @@ def _execute(filters=None, additional_table_columns=None, additional_query_colum
 			"sales_person":d.sales_person,
 			"serial_no":d.serial_no
 		}
+		# Convert mrp to float safely
+		try:
+			mrp_value = float(d.mrp)
+		except (TypeError, ValueError):
+			mrp_value = None  # if not convertible (e.g. empty or invalid)
+
+		# Now check safely
+		if mrp_value is not None and mrp_value >= 0:
+			row["mrp"] = mrp_value
+		else:
+			# Fetch from Item master if MRP < 0 or invalid
+			item_mrp = frappe.db.get_value("Item", d.item_code, "mrp") or 0
+			row["mrp"] = item_mrp
+
 
 		if additional_query_columns:
 			for col in additional_query_columns:
@@ -162,44 +175,44 @@ def get_purchase_rate(data):
 	if not data:
 		return data
 
+	# --- Collect all unique item_codes and serial_nos ---
 	item_codes = list({d['item_code'] for d in data if d.get('item_code')})
-	if not item_codes:
+	serial_nos = list({d['serial_no'] for d in data if d.get('serial_no')})
+
+	if not item_codes and not serial_nos:
 		return data
 
-	# --- Fetch purchase rates from Purchase Invoice and Stock Entry ---
-	pii_rates = frappe.db.get_all(
-		"Purchase Invoice Item",
-		filters={"item_code": ["in", item_codes]},
-		fields=["item_code", "serial_no", "net_rate as rate"]
-	)
-	se_rates = frappe.db.get_all(
-		"Stock Entry Detail",
-		filters={"item_code": ["in", item_codes]},
-		fields=["item_code", "serial_no", "basic_rate as rate"]
-	)
+	# ============================================================
+	# 1️⃣  FETCH FROM SERIAL NO (for serialized items)
+	# ============================================================
+	serial_data = frappe.db.sql("""
+		SELECT 
+			name AS serial_no,
+			item_code,
+			IFNULL(purchase_rate, 0) AS rate,
+			purchase_date
+		FROM `tabSerial No`
+		WHERE item_code IN %(items)s
+			AND name IN %(serials)s
+		ORDER BY purchase_date DESC
+	""", {"items": item_codes, "serials": serial_nos}, as_dict=True)
 
-	# --- Prepare lookup maps ---
-	pii_rate_map, se_rate_map = {}, {}
+	serial_rate_map = {}
+	for row in serial_data:
+		key = (row["item_code"], row["serial_no"])
+		# Keep only the most recent (since ordered DESC)
+		if key not in serial_rate_map:
+			serial_rate_map[key] = row["rate"]
 
-	for d in pii_rates:
-		if d.get("serial_no"):
-			for sn in [s.strip() for s in d["serial_no"].split("\n") if s.strip()]:
-				pii_rate_map[sn] = d["rate"]
-		else:
-			pii_rate_map[d["item_code"]] = d["rate"]
-
-	for d in se_rates:
-		if d.get("serial_no"):
-			for sn in [s.strip() for s in d["serial_no"].split("\n") if s.strip()]:
-				se_rate_map[sn] = d["rate"]
-		else:
-			se_rate_map[d["item_code"]] = d["rate"]
-
-	# --- Collect all (invoice, item_code) pairs for SLE query ---
-	invoice_item_pairs = [(d["invoice"], d["item_code"]) for d in data if d.get("invoice") and d.get("item_code")]
+	# ============================================================
+	# 2️⃣  FETCH FROM SLE (for non-serialized items)
+	# ============================================================
+	invoice_item_pairs = [
+		(d["invoice"], d["item_code"]) 
+		for d in data if d.get("invoice") and d.get("item_code")
+	]
 	invoices = list({inv for inv, _ in invoice_item_pairs})
 
-	# --- Fetch SLE rates for specific (invoice, item_code) pairs ---
 	sle_rate_map = {}
 	if invoices:
 		sle_data = frappe.db.sql("""
@@ -221,10 +234,12 @@ def get_purchase_rate(data):
 
 		for row in sle_data:
 			key = (row["voucher_no"], row["item_code"])
-			if key not in sle_rate_map:  # only latest per (invoice, item_code)
+			if key not in sle_rate_map:
 				sle_rate_map[key] = row["rate"]
 
-	# --- Assign purchase rate per row ---
+	# ============================================================
+	# 3️⃣  ASSIGN PURCHASE RATE BACK TO DATA
+	# ============================================================
 	for d in data:
 		item_code = d.get("item_code")
 		if not item_code:
@@ -234,21 +249,13 @@ def get_purchase_rate(data):
 		serial_no = d.get("serial_no")
 
 		if serial_no:
-			# Serialized item: prefer serial_no rate
-			d["purchase_rate"] = (
-				pii_rate_map.get(serial_no)
-				or se_rate_map.get(serial_no)
-				or pii_rate_map.get(item_code)
-				or se_rate_map.get(item_code)
-				or sle_rate_map.get((invoice, item_code))
-				or 0
-			)
+			# Serialized item → lookup from Serial No
+			d["purchase_rate"] = serial_rate_map.get((item_code, serial_no), 0)
 		else:
-			# Non-serialized: use SLE by (invoice, item_code)
-			d["purchase_rate"] = sle_rate_map.get((invoice, item_code)) or 0
+			# Non-serialized item → lookup from SLE
+			d["purchase_rate"] = sle_rate_map.get((invoice, item_code), 0)
 
 	return data
-
 
 def get_customer_type(data):
 	if not data:
