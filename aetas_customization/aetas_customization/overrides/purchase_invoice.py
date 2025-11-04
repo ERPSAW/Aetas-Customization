@@ -1,5 +1,11 @@
 import frappe
-from erpnext.stock.doctype.serial_no.serial_no import get_auto_serial_nos
+import frappe
+try:
+    # ERPNext v14
+    from erpnext.stock.doctype.serial_no.serial_no import get_auto_serial_nos as get_serial_nos
+except ImportError:
+    # ERPNext v15
+    from erpnext.stock.doctype.serial_no.serial_no import get_available_serial_nos as get_serial_nos
 
 def before_validate(self, method):
     try:
@@ -32,7 +38,12 @@ def before_validate(self, method):
                     # serial_no_series = f"{store_code}{attribute_code2}{unique_code}{attribute_code3}.###"
                     serial_no_series = f"{store_code}{attribute_code2}{unique_code}.###"
                     
-                    created_serial_nos = get_auto_serial_nos(serial_no_series, int(item.qty))
+                    try:
+                        created_serial_nos = get_serial_nos(serial_no_series, int(item.qty))
+                    except TypeError:
+                        # ERPNext v15 might have different arguments (e.g. no series param)
+                        created_serial_nos = get_serial_nos(item_code=item.item_code, qty=int(item.qty))
+                        
                     if created_serial_nos:
                         # item.serial_no = created_serial_nos
                         clean_serial_nos = [serial_no.replace("-", "") for serial_no in created_serial_nos.split("\n") if serial_no]
