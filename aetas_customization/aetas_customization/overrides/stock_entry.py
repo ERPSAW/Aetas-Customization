@@ -1,5 +1,5 @@
 import frappe
-from erpnext.stock.doctype.serial_no.serial_no import get_auto_serial_nos
+from erpnext.stock.doctype.serial_no.serial_no import get_available_serial_nos as get_auto_serial_nos
 
 def before_validate(self, method):
     try:

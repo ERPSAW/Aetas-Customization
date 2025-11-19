@@ -1,11 +1,6 @@
 import frappe
-import frappe
-try:
-    # ERPNext v14
-    from erpnext.stock.doctype.serial_no.serial_no import get_auto_serial_nos as get_serial_nos
-except ImportError:
-    # ERPNext v15
-    from erpnext.stock.doctype.serial_no.serial_no import get_available_serial_nos as get_serial_nos
+# ERPNext v15
+from erpnext.stock.doctype.serial_no.serial_no import get_available_serial_nos as get_serial_nos
 
 def before_validate(self, method):
     try:
