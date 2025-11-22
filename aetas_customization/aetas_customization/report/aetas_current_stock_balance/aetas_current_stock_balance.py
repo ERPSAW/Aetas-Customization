@@ -3,6 +3,7 @@
 
 import frappe
 from datetime import datetime
+from frappe.utils import getdate
 
 
 def execute(filters=None):
@@ -13,17 +14,20 @@ def execute(filters=None):
 def get_data(filters):
 	data = []	
 
+	sn_filters = {"status": "Active"}
+
 	if filters.get("from_date") and filters.get("to_date"):
 		from_date = filters.get("from_date")
 		to_date = filters.get("to_date")
+
 		if from_date > to_date:
 			frappe.throw("From Date cannot be greater than To Date")
-	
-	if filters.get("from_date") and filters.get("to_date"):
-		filters = {"status": "Active", "purchase_date": ["between", (filters.get("from_date"), filters.get("to_date"))]}
-	else:
-		filters = {"status": "Active"}
-	serial_nos = frappe.db.get_all("Serial No", filters=filters, fields=['*'])
+
+		# creation is datetime, convert date → full range
+		sn_filters["creation"] = ["between", (f"{from_date} 00:00:00", f"{to_date} 23:59:59")]
+
+	serial_nos = frappe.db.get_all("Serial No", filters=sn_filters, fields=['*'])
+
 	if not serial_nos:
 		return data
 	
@@ -47,13 +51,13 @@ def get_data(filters):
 		stock_uom = item_data.get("stock_uom", "")
 
 		# Calculate stock age
-		creation_date = serial_no.purchase_date
+		creation_date = getdate(serial_no.creation)
 		today_date = datetime.strptime(frappe.utils.today(), '%Y-%m-%d').date()
 		stock_age = (today_date - creation_date).days
 
 		# Build the row for each serial number
 		row = {
-			"creation_date": serial_no.purchase_date,
+			"creation_date": getdate(serial_no.creation),
 			"name": serial_no.name,
 			"item_code": serial_no.item_code,
 			"item_name": serial_no.item_name,
