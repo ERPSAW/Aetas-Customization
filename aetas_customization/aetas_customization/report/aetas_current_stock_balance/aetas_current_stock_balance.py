@@ -37,13 +37,63 @@ def get_data(filters):
 	item_map = {item['name']: item for item in item_details}
 	
 	for serial_no in serial_nos:
+		
+		# if serial_no.purchase_document_type == "Stock Entry":
+		# 	mrp = frappe.db.get_value("Stock Entry Detail", {"parent": serial_no.purchase_document_no,"item_code": serial_no.item_code,"serial_no": ["like", f"%{serial_no.name}%"]}, "custom_mrp") or 0
+		# elif serial_no.purchase_document_type == "Purchase Invoice":
+		# 	mrp = frappe.db.get_value("Purchase Invoice Item", {"parent": serial_no.purchase_document_no,"item_code": serial_no.item_code,"serial_no": ["like", f"%{serial_no.name}%"]}, "mrp") or 0
+		# elif serial_no.purchase_document_type == "Sales Invoice":
+		# 	mrp = frappe.db.get_value("Sales Invoice Item", {"parent": serial_no.purchase_document_no,"item_code": serial_no.item_code,"serial_no": ["like", f"%{serial_no.name}%"]}, "mrp") or 0
+
 		mrp = 0
-		if serial_no.purchase_document_type == "Stock Entry":
-			mrp = frappe.db.get_value("Stock Entry Detail", {"parent": serial_no.purchase_document_no,"item_code": serial_no.item_code,"serial_no": ["like", f"%{serial_no.name}%"]}, "custom_mrp") or 0
-		elif serial_no.purchase_document_type == "Purchase Invoice":
-			mrp = frappe.db.get_value("Purchase Invoice Item", {"parent": serial_no.purchase_document_no,"item_code": serial_no.item_code,"serial_no": ["like", f"%{serial_no.name}%"]}, "mrp") or 0
-		elif serial_no.purchase_document_type == "Sales Invoice":
-			mrp = frappe.db.get_value("Sales Invoice Item", {"parent": serial_no.purchase_document_no,"item_code": serial_no.item_code,"serial_no": ["like", f"%{serial_no.name}%"]}, "mrp") or 0
+		purchase_rate = 0
+
+		doc_no = serial_no.purchase_document_no
+		sn = serial_no.name
+		item_code = serial_no.item_code
+
+		if doc_no:
+
+			# 1) STOCK ENTRY DETAIL (highest priority)
+			row = frappe.db.get_value(
+				"Stock Entry Detail",
+				{
+					"parent": doc_no,
+					"item_code": item_code,
+					"serial_no": ["like", f"%{sn}%"]
+				},
+				["basic_rate", "custom_mrp"],
+				as_dict=True
+			)
+			if row:
+				purchase_rate = row.basic_rate or 0
+				mrp = row.custom_mrp or 0
+
+			# 2) PURCHASE INVOICE ITEM (only if still not found)
+			if not mrp:
+				row = frappe.db.get_value(
+					"Purchase Invoice Item",
+					{
+						"parent": doc_no,
+						"item_code": item_code,
+						"serial_no": ["like", f"%{sn}%"]
+					},
+					["net_rate", "mrp"],
+					as_dict=True
+				)
+				if row:
+					purchase_rate = row.net_rate or 0
+					mrp = row.mrp or 0
+
+		#3) FALLBACK — ITEM MASTER MRP
+		if not mrp:
+			mrp = frappe.db.get_value("Item", item_code, "mrp") or 0
+
+		#4) FINAL RATE FALLBACK
+		if not purchase_rate:
+			purchase_rate = serial_no.purchase_rate or 0
+
+
 		
 		# Get item details from pre-fetched data
 		item_data = item_map.get(serial_no.item_code, {})
@@ -65,7 +115,7 @@ def get_data(filters):
 			"stock_uom": stock_uom,
 			"warehouse": serial_no.warehouse,
 			"available_qty": 1,
-			"purchase_rate": serial_no.purchase_rate,
+			"purchase_rate": purchase_rate,
 			"mrp": mrp,
 			"stock_age": stock_age,
 			"company": serial_no.company

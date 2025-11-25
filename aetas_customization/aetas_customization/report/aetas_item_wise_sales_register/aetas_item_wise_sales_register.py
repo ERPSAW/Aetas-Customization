@@ -176,44 +176,77 @@ def get_purchase_rate(data):
 		return data
 
 	# --- Collect all unique item_codes and serial_nos ---
-	item_codes = list({d['item_code'] for d in data if d.get('item_code')})
-	serial_nos = list({d['serial_no'] for d in data if d.get('serial_no')})
+	item_codes = list({d.get('item_code') for d in data if d.get('item_code')})
+	serial_nos = list({d.get('serial_no') for d in data if d.get('serial_no')})
 
-	if not item_codes and not serial_nos:
+	if not item_codes:
 		return data
 
-	# ============================================================
-	# 1️⃣  FETCH FROM SERIAL NO (for serialized items)
-	# ============================================================
-	serial_data = frappe.db.sql("""
-		SELECT 
-			name AS serial_no,
-			item_code,
-			IFNULL(purchase_rate, 0) AS rate,
-			purchase_date
-		FROM `tabSerial No`
-		WHERE item_code IN %(items)s
-			AND name IN %(serials)s
-		ORDER BY purchase_date DESC
-	""", {"items": item_codes, "serials": serial_nos}, as_dict=True)
-
 	serial_rate_map = {}
-	for row in serial_data:
-		key = (row["item_code"], row["serial_no"])
-		# Keep only the most recent (since ordered DESC)
-		if key not in serial_rate_map:
-			serial_rate_map[key] = row["rate"]
 
 	# ============================================================
-	# 2️⃣  FETCH FROM SLE (for non-serialized items)
+	# SERIALIZED ITEMS LOOKUP (ONLY IF serial_nos NOT EMPTY)
+	# ============================================================
+	if serial_nos:
+
+		# ✅ 1) STOCK ENTRY DETAIL
+		sed_rows = frappe.db.sql("""
+			SELECT
+				sed.item_code,
+				sed.serial_no,
+				sed.basic_rate,
+				sed.custom_mrp,
+				sed.parent
+			FROM `tabStock Entry Detail` sed
+			WHERE sed.serial_no IN %(serials)s
+			AND sed.item_code IN %(items)s
+			ORDER BY sed.modified DESC
+		""", {"serials": serial_nos, "items": item_codes}, as_dict=True)
+
+		for row in sed_rows:
+			key = (row.item_code, row.serial_no)
+			if key not in serial_rate_map:
+				serial_rate_map[key] = row.basic_rate or row.custom_mrp or 0
+
+		# ✅ 2) PURCHASE INVOICE ITEM (only missing)
+		if serial_rate_map and len(serial_rate_map) < len(item_codes) * len(serial_nos):
+			pi_rows = frappe.db.sql("""
+				SELECT
+					pii.item_code,
+					pii.serial_no,
+					pii.net_rate,
+					pii.mrp
+				FROM `tabPurchase Invoice Item` pii
+				WHERE pii.serial_no IN %(serials)s
+				AND pii.item_code IN %(items)s
+				ORDER BY pii.modified DESC
+			""", {"serials": serial_nos, "items": item_codes}, as_dict=True)
+
+			for row in pi_rows:
+				key = (row.item_code, row.serial_no)
+				if key not in serial_rate_map:
+					serial_rate_map[key] = row.net_rate or row.mrp or 0
+
+		# ✅ 3) ITEM MASTER fallback
+		for ic in item_codes:
+			fallback = frappe.db.get_value("Item", ic, "mrp") or 0
+			for sn in serial_nos:
+				key = (ic, sn)
+				if key not in serial_rate_map:
+					serial_rate_map[key] = fallback
+
+	# ============================================================
+	# NON-SERIAL ITEMS → FETCH FROM SLE
 	# ============================================================
 	invoice_item_pairs = [
-		(d["invoice"], d["item_code"]) 
+		(d.get("invoice"), d.get("item_code"))
 		for d in data if d.get("invoice") and d.get("item_code")
 	]
+
 	invoices = list({inv for inv, _ in invoice_item_pairs})
 
 	sle_rate_map = {}
+
 	if invoices:
 		sle_data = frappe.db.sql("""
 			SELECT 
@@ -233,12 +266,12 @@ def get_purchase_rate(data):
 		""", {"invoices": invoices, "items": item_codes}, as_dict=True)
 
 		for row in sle_data:
-			key = (row["voucher_no"], row["item_code"])
+			key = (row.voucher_no, row.item_code)
 			if key not in sle_rate_map:
-				sle_rate_map[key] = row["rate"]
+				sle_rate_map[key] = row.rate
 
 	# ============================================================
-	# 3️⃣  ASSIGN PURCHASE RATE BACK TO DATA
+	# ASSIGN BACK TO DATA
 	# ============================================================
 	for d in data:
 		item_code = d.get("item_code")
@@ -249,13 +282,12 @@ def get_purchase_rate(data):
 		serial_no = d.get("serial_no")
 
 		if serial_no:
-			# Serialized item → lookup from Serial No
 			d["purchase_rate"] = serial_rate_map.get((item_code, serial_no), 0)
 		else:
-			# Non-serialized item → lookup from SLE
 			d["purchase_rate"] = sle_rate_map.get((invoice, item_code), 0)
 
 	return data
+
 
 def get_customer_type(data):
 	if not data:
