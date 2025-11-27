@@ -173,146 +173,150 @@ def _execute(filters=None, additional_table_columns=None, additional_query_colum
 	return columns, data, None, None, None, skip_total_row
 
 def get_purchase_rate(data):
-	if not data:
-		return data
+    if not data:
+        return data
 
-	# --- Collect unique item_codes and serial_nos ---
-	item_codes = list({d.get("item_code") for d in data if d.get("item_code")})
-	serial_nos = list({d.get("serial_no") for d in data if d.get("serial_no")})
+    # ============================================================
+    # COLLECT UNIQUE ITEM CODES & CLEANED SERIAL NOS
+    # ============================================================
+    item_codes = list({d.get("item_code") for d in data if d.get("item_code")})
 
-	if not item_codes:
-		return data
+    serial_nos = []
+    for d in data:
+        sn = d.get("serial_no")
+        if sn:
+            # Handle \n , comma, mixed
+            parts = [x.strip() for x in sn.replace("\n", ",").split(",") if x.strip()]
+            serial_nos.extend(parts)
 
-	serial_rate_map = {}
+    serial_nos = list(set(serial_nos))
 
-	# ============================================================
-	# SERIALIZED ITEMS LOOKUP (supports multi-serial in DB)
-	# ============================================================
-	if serial_nos:
+    if not item_codes:
+        return data
 
-		# ✅ 1) STOCK ENTRY DETAIL
-		sed_rows = frappe.db.sql("""
-			SELECT
-				sed.item_code,
-				sed.serial_no,
-				sed.basic_rate,
-				sed.custom_mrp
-			FROM `tabStock Entry Detail` sed
-			WHERE sed.item_code IN %(items)s
-			AND (
-				""" + " OR ".join([
-					"FIND_IN_SET(%(sn_" + str(i) + ")s, REPLACE(sed.serial_no, '\\n', ','))"
-					for i in range(len(serial_nos))
-				]) + """
-			)
-			ORDER BY sed.modified DESC
-		""", {
-			"items": item_codes,
-			**{f"sn_{i}": sn for i, sn in enumerate(serial_nos)}
-		}, as_dict=True)
+    serial_rate_map = {}
+    serial_mrp_map = {}
 
-		for row in sed_rows:
-			for sn in (row.serial_no or "").replace("\n", ",").split(","):
-				key = (row.item_code, sn.strip())
-				if key not in serial_rate_map:
-					serial_rate_map[key] = row.basic_rate or row.custom_mrp or 0
+    # ============================================================
+    # FETCH RAW SERIAL DATA IN BULK (NO FIND_IN_SET)
+    # ============================================================
 
-		# ✅ 2) PURCHASE INVOICE ITEM
-		pi_rows = frappe.db.sql("""
-			SELECT
-				pii.item_code,
-				pii.serial_no,
-				pii.net_rate,
-				pii.mrp
-			FROM `tabPurchase Invoice Item` pii
-			WHERE pii.item_code IN %(items)s
-			AND (
-				""" + " OR ".join([
-					"FIND_IN_SET(%(sn_" + str(i) + ")s, REPLACE(pii.serial_no, '\\n', ','))"
-					for i in range(len(serial_nos))
-				]) + """
-			)
-			ORDER BY pii.modified DESC
-		""", {
-			"items": item_codes,
-			**{f"sn_{i}": sn for i, sn in enumerate(serial_nos)}
-		}, as_dict=True)
+    # ---------- 1) STOCK ENTRY DETAIL ----------
+    sed_rows = frappe.db.sql("""
+        SELECT
+            item_code,
+            serial_no,
+            basic_rate,
+            custom_mrp
+        FROM `tabStock Entry Detail`
+        WHERE item_code IN %(items)s
+    """, {"items": item_codes}, as_dict=True)
 
-		for row in pi_rows:
-			for sn in (row.serial_no or "").replace("\n", ",").split(","):
-				key = (row.item_code, sn.strip())
-				if key not in serial_rate_map:
-					serial_rate_map[key] = row.net_rate or row.mrp or 0
+    # Pre-process serial_no lists
+    for row in sed_rows:
+        serial_list = []
+        if row.serial_no:
+            serial_list = [x.strip() for x in row.serial_no.replace("\n", ",").split(",") if x.strip()]
 
-		# ✅ 3) ITEM MASTER fallback
-		for ic in item_codes:
-			fallback = frappe.db.get_value("Item", ic, "mrp") or 0
-			for sn in serial_nos:
-				key = (ic, sn)
-				if key not in serial_rate_map:
-					serial_rate_map[key] = fallback
+        for sn in serial_list:
+            key = (row.item_code, sn)
+            if key not in serial_rate_map:
+                serial_rate_map[key] = row.basic_rate or row.custom_mrp or 0
+            if key not in serial_mrp_map and row.custom_mrp:
+                serial_mrp_map[key] = row.custom_mrp
 
-	# ============================================================
-	# NON-SERIAL ITEMS → SLE
-	# ============================================================
-	invoice_item_pairs = [
-		(d.get("invoice"), d.get("item_code"))
-		for d in data if d.get("invoice") and d.get("item_code")
-	]
+    # ---------- 2) PURCHASE INVOICE ITEM ----------
+    pii_rows = frappe.db.sql("""
+        SELECT
+            item_code,
+            serial_no,
+            net_rate,
+            mrp
+        FROM `tabPurchase Invoice Item`
+        WHERE item_code IN %(items)s
+    """, {"items": item_codes}, as_dict=True)
 
-	invoices = list({inv for inv, _ in invoice_item_pairs})
-	sle_rate_map = {}
+    for row in pii_rows:
+        serial_list = []
+        if row.serial_no:
+            serial_list = [x.strip() for x in row.serial_no.replace("\n", ",").split(",") if x.strip()]
 
-	if invoices:
-		sle_data = frappe.db.sql("""
-			SELECT 
-				item_code,
-				voucher_no,
-				CASE 
-					WHEN valuation_rate > 0 THEN valuation_rate
-					WHEN incoming_rate > 0 THEN incoming_rate
-					ELSE 0
-				END AS rate
-			FROM `tabStock Ledger Entry`
-			WHERE voucher_type = 'Sales Invoice'
-				AND voucher_no IN %(invoices)s
-				AND item_code IN %(items)s
-			ORDER BY posting_date DESC, posting_time DESC
-		""", {"invoices": invoices, "items": item_codes}, as_dict=True)
+        for sn in serial_list:
+            key = (row.item_code, sn)
+            if key not in serial_rate_map:
+                serial_rate_map[key] = row.net_rate or row.mrp or 0
+            if key not in serial_mrp_map and row.mrp:
+                serial_mrp_map[key] = row.mrp
 
-		for row in sle_data:
-			key = (row.voucher_no, row.item_code)
-			if key not in sle_rate_map:
-				sle_rate_map[key] = row.rate
+    # ---------- 3) ITEM MASTER FALLBACK ----------
+    item_mrp_cache = {
+        ic: frappe.db.get_value("Item", ic, "mrp") or 0
+        for ic in item_codes
+    }
 
-	# ============================================================
-	# ASSIGN VALUES BACK
-	# ============================================================
-	for d in data:
-		item_code = d.get("item_code")
-		if not item_code:
-			continue
+    # ============================================================
+    # NON-SERIAL ITEMS: SLE LOOKUP
+    # ============================================================
+    invoice_item_pairs = [
+        (d.get("invoice"), d.get("item_code"))
+        for d in data if d.get("invoice") and d.get("item_code")
+    ]
+    invoices = list({inv for inv, _ in invoice_item_pairs})
 
-		invoice = d.get("invoice")
-		serial_no = d.get("serial_no")
+    sle_rate_map = {}
 
-		# --- PURCHASE RATE ---
-		if serial_no:
-			d["purchase_rate"] = serial_rate_map.get((item_code, serial_no), 0)
-		else:
-			d["purchase_rate"] = sle_rate_map.get((invoice, item_code), 0)
+    if invoices:
+        sle_data = frappe.db.sql("""
+            SELECT 
+                item_code,
+                voucher_no,
+                CASE 
+                    WHEN valuation_rate > 0 THEN valuation_rate
+                    WHEN incoming_rate > 0 THEN incoming_rate
+                    ELSE 0
+                END AS rate
+            FROM `tabStock Ledger Entry`
+            WHERE voucher_type = 'Sales Invoice'
+                AND voucher_no IN %(invoices)s
+                AND item_code IN %(items)s
+            ORDER BY posting_date DESC, posting_time DESC
+        """, {"invoices": invoices, "items": item_codes}, as_dict=True)
 
-		# --- MRP LOGIC ---
-		if serial_no:
-			# serialized → take MRP from same serial lookup OR Item Master
-			d["mrp"] = serial_rate_map.get((item_code, serial_no)) \
-				if isinstance(serial_rate_map.get((item_code, serial_no)), (int, float)) \
-				else frappe.db.get_value("Item", item_code, "mrp") or 0
-		else:
-			# non-serialized → always fallback to Item Master
-			d["mrp"] = frappe.db.get_value("Item", item_code, "mrp") or 0
-	
-	return data
+        for row in sle_data:
+            key = (row.voucher_no, row.item_code)
+            if key not in sle_rate_map:
+                sle_rate_map[key] = row.rate
+
+    # ============================================================
+    # ASSIGN BACK VALUES
+    # ============================================================
+    for d in data:
+        item_code = d.get("item_code")
+        if not item_code:
+            continue
+
+        invoice = d.get("invoice")
+        serial_no = d.get("serial_no")
+
+        # Always clean serial
+        sn = None
+        if serial_no:
+            sn = serial_no.replace("\n", ",").split(",")[0].strip()
+
+        # ---------------- PURCHASE RATE ----------------
+        if sn:
+            d["purchase_rate"] = serial_rate_map.get((item_code, sn), item_mrp_cache.get(item_code))
+        else:
+            d["purchase_rate"] = sle_rate_map.get((invoice, item_code), item_mrp_cache.get(item_code))
+
+        # ---------------- MRP LOGIC ----------------
+        if sn:
+            d["mrp"] = serial_mrp_map.get((item_code, sn), item_mrp_cache.get(item_code))
+        else:
+            d["mrp"] = item_mrp_cache.get(item_code)
+
+    return data
+
 
 def get_customer_type(data):
 	if not data:
