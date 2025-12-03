@@ -33,90 +33,168 @@ class StockBalanceFilter(TypedDict):
 
 SLEntry = Dict[str, Any]
 
-
 def execute(filters: Optional[StockBalanceFilter] = None):
 	is_reposting_item_valuation_in_progress()
+
 	if not filters:
 		filters = {}
 
+	# Company currency
 	if filters.get("company"):
 		company_currency = erpnext.get_company_currency(filters.get("company"))
 	else:
 		company_currency = frappe.db.get_single_value("Global Defaults", "default_currency")
 
 	include_uom = filters.get("include_uom")
+
+	# Columns
 	columns = get_columns(filters)
+
+	# Items from filters
 	items = get_items(filters)
+
+	# Stock Ledger Entries
 	sle = get_stock_ledger_entries(filters, items)
 
+	# ------------------------------------------------
+	# 0️⃣ OPTIMIZATION — PRE-SORT SLE FOR FASTER FIFO
+	# ------------------------------------------------
+	if sle:
+		sle = sorted(
+			sle,
+			key=lambda d: (d.item_code, d.warehouse, d.posting_date, d.posting_time)
+		)
+
+	# ------------------------------------------------
+	# 1️⃣ ALWAYS LOAD SERIAL NUMBERS (FOR DISPLAY ONLY)
+	#    FIFO igores serial_no but UI must show them
+	# ------------------------------------------------
+	serial_map = {}
+	for d in sle:
+		key = (d.item_code, d.warehouse)
+		serial_map.setdefault(key, set())
+
+		if d.serial_no:
+			for sn in d.serial_no.split("\n"):
+				if sn.strip():
+					serial_map[key].add(sn.strip())
+
+	# ------------------------------------------------
+	# 2️⃣ IGNORE SERIAL NUMBERS IN FIFO (your option B)
+	# ------------------------------------------------
 	if filters.get("show_stock_ageing_data"):
 		filters["show_warehouse_wise_stock"] = True
+
+		for entry in sle:
+			if entry.get("serial_no"):
+				entry["serial_no"] = None
+
+		# Generate FIFO once
 		item_wise_fifo_queue = FIFOSlots(filters, sle).generate()
 
-	# if no stock ledger entry found return
+	# If no SLE after filtering
 	if not sle:
 		return columns, []
 
+	# Warehouse-wise qty map
 	iwb_map = get_item_warehouse_map(filters, sle)
+
+	# Item info
 	item_map = get_item_details(items, sle, filters)
+
+	# Reorder rules
 	item_reorder_detail_map = get_item_reorder_details(item_map.keys())
 
 	data = []
 	conversion_factors = {}
 
+	# FIFO filter helper
 	_func = itemgetter(1)
-
 	to_date = filters.get("to_date")
+
+	# ------------------------------------------------
+	# 3️⃣ FIFO AGEING CACHE – MAJOR SPEED BOOST
+	# ------------------------------------------------
+	ageing_cache = {}
 
 	for group_by_key in iwb_map:
 		item = group_by_key[1]
 		warehouse = group_by_key[2]
 		company = group_by_key[0]
 
-		if item_map.get(item):
-			qty_dict = iwb_map[group_by_key]
+		if not item_map.get(item):
+			continue
+
+		qty_dict = iwb_map[group_by_key]
+
+		# Reorder values
+		if item + warehouse in item_reorder_detail_map:
+			item_reorder_level = item_reorder_detail_map[item + warehouse]["warehouse_reorder_level"]
+			item_reorder_qty = item_reorder_detail_map[item + warehouse]["warehouse_reorder_qty"]
+		else:
 			item_reorder_level = 0
 			item_reorder_qty = 0
-			if item + warehouse in item_reorder_detail_map:
-				item_reorder_level = item_reorder_detail_map[item + warehouse]["warehouse_reorder_level"]
-				item_reorder_qty = item_reorder_detail_map[item + warehouse]["warehouse_reorder_qty"]
 
-			serial_numbers = filter_serial_numbers(item, warehouse, filters.get("to_date"))	
+		# Serial numbers (restored from earlier map)
+		serial_numbers = serial_map.get((item, warehouse), [])
 
-			report_data = {
-				"currency": company_currency,
-				"item_code": item,
-				"warehouse": warehouse,
-				"company": company,
-				"reorder_level": item_reorder_level,
-				"reorder_qty": item_reorder_qty,
-				"serial_no": ', '.join(serial_numbers),
-			}
-			report_data.update(item_map[item])
-			report_data.update(qty_dict)
+		report_data = {
+			"currency": company_currency,
+			"item_code": item,
+			"warehouse": warehouse,
+			"company": company,
+			"reorder_level": item_reorder_level,
+			"reorder_qty": item_reorder_qty,
+			"serial_no": ", ".join(sorted(serial_numbers)) if serial_numbers else "",
+		}
 
-			if include_uom:
-				conversion_factors.setdefault(item, item_map[item].conversion_factor)
+		report_data.update(item_map[item])
+		report_data.update(qty_dict)
 
-			if filters.get("show_stock_ageing_data"):
-				fifo_queue = item_wise_fifo_queue[(item, warehouse)].get("fifo_queue")
+		# UOM conversion factor
+		if include_uom:
+			conversion_factors.setdefault(item, item_map[item].conversion_factor)
 
-				stock_ageing_data = {"average_age": 0, "earliest_age": 0, "latest_age": 0}
+		# ------------------------------------------------
+		# 4️⃣ AGEING CALCULATION (FAST)
+		# ------------------------------------------------
+		if filters.get("show_stock_ageing_data"):
+
+			cache_key = (item, warehouse)
+
+			if cache_key not in ageing_cache:
+
+				fifo_queue = item_wise_fifo_queue.get(cache_key, {}).get("fifo_queue")
+
 				if fifo_queue:
+					# filter out blank / invalid rows and sort
 					fifo_queue = sorted(filter(_func, fifo_queue), key=_func)
-					if not fifo_queue:
-						continue
 
-					stock_ageing_data["average_age"] = get_average_age(fifo_queue, to_date)
-					stock_ageing_data["earliest_age"] = date_diff(to_date, fifo_queue[0][1])
-					stock_ageing_data["latest_age"] = date_diff(to_date, fifo_queue[-1][1])
+					if fifo_queue:
+						ageing_cache[cache_key] = {
+							"average_age": get_average_age(fifo_queue, to_date),
+							"earliest_age": date_diff(to_date, fifo_queue[0][1]),
+							"latest_age": date_diff(to_date, fifo_queue[-1][1]),
+						}
+					else:
+						ageing_cache[cache_key] = {
+							"average_age": 0, "earliest_age": 0, "latest_age": 0
+						}
+				else:
+					ageing_cache[cache_key] = {
+						"average_age": 0, "earliest_age": 0, "latest_age": 0
+					}
 
-				report_data.update(stock_ageing_data)
+			# apply cached values
+			report_data.update(ageing_cache[cache_key])
 
-			data.append(report_data)
+		data.append(report_data)
 
+	# Apply UOM columns
 	add_additional_uom_columns(columns, data, include_uom, conversion_factors)
+
 	return columns, data
+
 
 
 def get_columns(filters: StockBalanceFilter):
