@@ -26,8 +26,6 @@ def _execute(filters=None, additional_table_columns=None, additional_query_colum
 	company_currency = frappe.get_cached_value("Company", filters.get("company"), "default_currency")
 
 	item_list = get_items(filters, additional_query_columns)
-
-	frappe.log_error("Get Items",item_list)
 	if item_list:
 		itemised_tax, tax_columns = get_tax_accounts(item_list, columns, company_currency)
 
