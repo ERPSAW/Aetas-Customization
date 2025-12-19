@@ -69,6 +69,13 @@ def execute(filters: Optional[StockBalanceFilter] = None):
 	# 1️⃣ ALWAYS LOAD SERIAL NUMBERS (FOR DISPLAY ONLY)
 	#    FIFO igores serial_no but UI must show them
 	# ------------------------------------------------
+	active_serials = set(
+		frappe.get_all(
+			"Serial No",
+			filters={"status": "Active"},
+			pluck="name"
+		)
+	)
 	serial_map = {}
 	for d in sle:
 		key = (d.item_code, d.warehouse)
@@ -76,8 +83,9 @@ def execute(filters: Optional[StockBalanceFilter] = None):
 
 		if d.serial_no:
 			for sn in d.serial_no.split("\n"):
-				if sn.strip():
-					serial_map[key].add(sn.strip())
+				sn = sn.strip()
+				if sn and sn in active_serials:
+					serial_map[key].add(sn)
 
 	# ------------------------------------------------
 	# 2️⃣ IGNORE SERIAL NUMBERS IN FIFO (your option B)
@@ -603,40 +611,3 @@ def get_variant_values_for(items):
 		attribute_map[attr["parent"]].update({attr["attribute"]: attr["attribute_value"]})
 
 	return attribute_map
-
-
-def filter_serial_numbers(item_code, warehouse, to_date):
-    filtered_serial_numbers = []
-
-    # Function to parse date with multiple formats
-    def parse_date(date_str):
-        formats = ['%d-%m-%Y', '%Y-%m-%d']  # Add more formats if needed
-        for fmt in formats:
-            try:
-                return datetime.datetime.strptime(date_str, fmt)
-            except ValueError:
-                continue
-        raise ValueError(f"Date format for '{date_str}' is not recognized.")
-
-    if isinstance(to_date, str):
-        to_date = parse_date(to_date)
-
-    to_date = to_date.replace(hour=23, minute=59, second=59, microsecond=999999)
-
-    print(f"Adjusted to_date: {to_date}")
-
-    serial_nos = frappe.db.get_list(
-        'Serial No',
-        fields=['name'],
-        filters={
-            'creation': ['<=', to_date],
-            'item_code': item_code,
-            'warehouse': warehouse,
-            'status': 'Active' 
-        }
-    )
-
-    for serial in serial_nos:
-        filtered_serial_numbers.append(serial.get("name"))
-
-    return filtered_serial_numbers
