@@ -161,6 +161,10 @@ doc_events = {
     },
     "Warehouse":{
         "validate": "aetas_customization.aetas_customization.overrides.warehouse.validate",
+    },
+    "Lead":{
+        "after_insert":"aetas_customization.aetas_customization.overrides.lead.after_insert",
+        "on_update":"aetas_customization.aetas_customization.overrides.lead.on_update",
     }
 }
 

@@ -269,6 +269,8 @@ function show_customer_search_dialog(frm) {
             // Populate Form
             if (row.customer_name)
                 frm.set_value('first_name', row.customer_name);
+                frm.set_value('status','Open')
+                frm.set_value('type','Existing Customer')
 
             if (row.email_id)
                 frm.set_value('email_id', row.email_id);
