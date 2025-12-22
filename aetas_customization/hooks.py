@@ -61,6 +61,7 @@ doctype_js = {
     "Payment Entry":"custom_scripts/js/payment_entry.js",
     "Sales Invoice":"custom_scripts/js/sales_invoice.js",
     "Purchase Order":"custom_scripts/js/purchase_order.js",
+    "Lead":"custom_scripts/js/lead.js"
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -160,6 +161,10 @@ doc_events = {
     },
     "Warehouse":{
         "validate": "aetas_customization.aetas_customization.overrides.warehouse.validate",
+    },
+    "Lead":{
+        "after_insert":"aetas_customization.aetas_customization.overrides.lead.after_insert",
+        "on_update":"aetas_customization.aetas_customization.overrides.lead.on_update",
     }
 }
 
