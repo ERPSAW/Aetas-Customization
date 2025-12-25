@@ -5,8 +5,109 @@ frappe.ui.form.on('Lead', {
                 show_customer_search_dialog(frm);
             });
         }
+
+        if(!frm.doc.custom_si_ref && (frm.doc.status == 'Qualified' || frm.doc.status == 'Converted')){
+            frm.add_custom_button(__('Create Sales Invoice'), function() {
+                create_sales_invoice_from_lead(frm);
+            });
+        }
+
+        setTimeout(() => {
+            frm.remove_custom_button('Customer','Create');
+        }, 10);
+
+        frm.trigger("inject_approved_button_css");
+        frm.trigger("style_approved_buttons");
+    },
+
+    onload_post_render(frm) {
+        frm.trigger("inject_approved_button_css");
+        frm.trigger("style_approved_buttons");
+    },
+
+    inject_approved_button_css(frm) {
+        if (document.getElementById("approved-btn-style")) return;
+
+        const style = document.createElement("style");
+        style.id = "approved-btn-style";
+        style.innerHTML = `
+            button[data-fieldname="approved"] {
+                background-color: #28a745 !important;
+                color: #fff !important;
+                border: none !important;
+                display: flex; justify-content: center; align-items: center; height: 30px!important;
+                width: auto;
+            }
+
+            button[data-fieldname="approved"]:hover {
+                background-color: #218838 !important;
+                color: #fff !important;
+                border: none !important;
+                display: flex; justify-content: center; align-items: center; height: 100%;
+            }
+
+            button[data-fieldname="approved"]:disabled {
+                background-color: #28a745 !important;
+                opacity: 0.85;
+                cursor: not-allowed;
+            }
+        `;
+        document.head.appendChild(style);
+    },
+
+    style_approved_buttons(frm) {
+        if (!frm.fields_dict.custom_bids) return;
+
+        const grid = frm.fields_dict.custom_bids.grid;
+
+        setTimeout(() => {
+            (grid.grid_rows || []).forEach(row => {
+                const d = row.doc;
+
+                const $btn = $(row.wrapper)
+                    .find('button[data-fieldname="approved"]');
+
+                if (!$btn.length) return;
+
+                if (d.status === "Approved") {
+                    $btn
+                        .text("Approved")
+                        .prop("disabled", true);
+                } else {
+                    $btn
+                        .text("Approve")
+                        .prop("disabled", false);
+                }
+            });
+        }, 50);
     }
 });
+
+frappe.ui.form.on('Sales Person Bids', {
+
+    // Button click handler
+    approved(frm, cdt, cdn) {
+        const row = locals[cdt][cdn];
+
+        // Prevent re-approval
+        if (row.status === "Approved") {
+            frappe.show_alert({
+                message: __("Already approved"),
+                indicator: "orange"
+            });
+            return;
+        }
+
+        // Set status to Approved
+        frappe.model.set_value(cdt, cdn, "status", "Approved");
+
+        frappe.show_alert({
+            message: __("Bid Approved"),
+            indicator: "green"
+        });
+    }
+});
+
 
 function show_customer_search_dialog(frm) {
     // --- State Management ---
@@ -173,10 +274,16 @@ function show_customer_search_dialog(frm) {
                 }
 
                 if (r.message) {
+                    console.log('Search Results:', r.message);
                     // Extract data from new API response structure
                     let results = r.message.data || [];
                     total_pages = r.message.total_pages || 0;
                     current_page = r.message.page || 1;
+
+                    results.forEach(row => {
+                        // If custom_contact exists, use it; otherwise, use mobile
+                        row.mobile_no = row.custom_contact || row.mobile_no;
+                    });
 
                     if (grid_field && grid_field.grid) {
                         grid_field.df.data = results;
@@ -263,6 +370,7 @@ function show_customer_search_dialog(frm) {
 
             // Grid data is zero-based
             let row = grid.df.data[idx - 1];
+            console.log('Selected Row:', row);
 
             if (!row) return;
 
@@ -271,12 +379,15 @@ function show_customer_search_dialog(frm) {
                 frm.set_value('first_name', row.customer_name);
                 frm.set_value('status','Open')
                 frm.set_value('type','Existing Customer')
+                frm.set_value('customer', row.name);
 
             if (row.email_id)
                 frm.set_value('email_id', row.email_id);
 
-            if (row.mobile_no)
-                frm.set_value('mobile_no', row.mobile_no);
+            let mobile = row.custom_contact || row.mobile_no;
+            if (mobile)
+                frm.set_value('custom_contact', mobile);
+                frm.set_value('mobile_no', mobile);
 
             if (row.custom_sales_person && frm.fields_dict.custom_sales_person) {
                 frm.set_value('custom_sales_person', row.custom_sales_person);
@@ -290,4 +401,23 @@ function show_customer_search_dialog(frm) {
             d.hide();
         });
     }, 200); // 200ms delay to ensure DOM is ready
+}
+
+function create_sales_invoice_from_lead(frm) {
+    frappe.call({
+        method: 'frappe.client.get',
+        args: {
+            doctype: 'Lead',
+            name: frm.doc.name
+        },
+        callback: function (r) {
+            if (r.message) {
+                var lead = r.message;
+                frappe.model.open_mapped_doc({
+                    method: 'aetas_customization.overrides.lead.make_sales_invoice_from_lead',
+                    frm: frm
+                });
+            }
+        }
+    });
 }

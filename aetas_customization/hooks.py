@@ -17,7 +17,9 @@ fixtures = [
                 "Payment Entry-custom_advance_payment_receipt","Cost Center-custom_letter_head",
                 "Item Group-custom_unique_code","Item Group-custom_attribute_2","Item-custom_enable_dynamic_sn_naming",
                 "Item-custom_attribute_3","Warehouse-custom_store_code",
-                "Sales Invoice-custom_aetas_coupon_code"
+                "Sales Invoice-custom_aetas_coupon_code","Lead-custom_itemservice","Lead-custom_brand","Lead-custom_model",
+                "Lead-custom_preferred_store","Lead-custom_date","Lead-custom_proppsed_bids","Lead-custom_bids","Lead-custom_sales_person",
+                "Sales Invoice-custom_lead_ref","Lead-custom_si_ref","Lead-custom_cold_description","Lead-custom_contact","Customer-custom_customer_without_sales"
             ]
         ]
     ]},
@@ -26,7 +28,9 @@ fixtures = [
             "name", "in", [
                 "Customer-mobile_no-in_standard_filter"
                 "Purchase Invoice Item-margin_custom","Serial No-mrp",
-                "Payment Reconciliation Invoice-custom_bill_no"
+                "Payment Reconciliation Invoice-custom_bill_no",
+                "Lead-type-options","Lead-status-options","Lead-status-default","Lead-customer-depends_on",
+                "Lead-contact_info_tab-hidden","Lead-organization_section-hidden","Lead-main-field_order"
             ]
         ]
     ]}
@@ -137,6 +141,7 @@ override_doctype_class = {
 
 doc_events = {
 	"Purchase Invoice": {
+        "before_validate":"aetas_customization.aetas_customization.overrides.purchase_invoice.before_validate",
 		"on_submit": "aetas_customization.aetas_customization.overrides.purchase_invoice.on_submit",
 	},
     "Sales Invoice": {
@@ -147,9 +152,6 @@ doc_events = {
     "Payment Entry": {
 		"on_submit": "aetas_customization.aetas_customization.overrides.payment_entry.on_submit",
 	},
-    "Purchase Invoice":{
-        "before_validate":"aetas_customization.aetas_customization.overrides.purchase_invoice.before_validate",
-    },
     "Stock Entry":{
         "before_validate":"aetas_customization.aetas_customization.overrides.stock_entry.before_validate",
     },
@@ -163,8 +165,9 @@ doc_events = {
         "validate": "aetas_customization.aetas_customization.overrides.warehouse.validate",
     },
     "Lead":{
-        "after_insert":"aetas_customization.aetas_customization.overrides.lead.after_insert",
-        "on_update":"aetas_customization.aetas_customization.overrides.lead.on_update",
+        "after_insert":"aetas_customization.overrides.lead.after_insert",
+        "on_update":"aetas_customization.overrides.lead.on_update",
+        "validate":"aetas_customization.overrides.lead.validate",
     }
 }
 
