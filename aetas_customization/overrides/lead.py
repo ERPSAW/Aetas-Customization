@@ -1,65 +1,128 @@
 import frappe
-
+from frappe.model.mapper import get_mapped_doc
 
 def after_insert(doc, method):
-    customer_creation_via_lead(doc, method)
+    if doc.is_new():
+        customer_creation_via_lead(doc)
+
 
 def on_update(doc, method):
-    customer_creation_via_lead(doc, method)
-    
-def customer_creation_via_lead(doc, method):
-    if not doc.lead_name:
+    customer_creation_via_lead(doc)
+
+def validate(doc, method):
+    if doc.status != "Qualified":
         return
 
-    lead = frappe.get_doc("Lead", doc.lead_name)
-
-    # Only for Qualified + New leads
-    if lead.status != "Qualified" and lead.type != "New":
-        return
-
-    # ---------- Mandatory field validation ----------
-    contact = lead.mobile_no or lead.phone
-    if not contact:
-        frappe.throw("Lead must have Mobile No or Phone to create Customer")
-
-    if not lead.source:
-        frappe.throw("Lead Source is mandatory to create Customer")
-
-    # ---------- Existing customer check ----------
-    or_filters = []
-    if lead.mobile_no:
-        or_filters.append({"custom_contact": lead.mobile_no})
-    if lead.phone:
-        or_filters.append({"custom_contact": lead.phone})
-
-    existing_customer = frappe.db.exists(
-        "Customer",
-        {"customer_name": lead.lead_name},
-        or_filters=or_filters
+    # Prevent duplicate child rows for same sales person
+    already_exists = any(
+        row.sales_person == doc.custom_sales_person
+        for row in doc.custom_bids
     )
 
-    if existing_customer:
+    if already_exists:
         return
 
-    # ---------- Create Customer ----------
-    customer = frappe.get_doc({
-        "doctype": "Customer",
-        "customer_name": lead.lead_name,
-        "customer_type": "Individual",
-        "customer_group": "All Customer Groups",
-        "territory": "All Territories",
-
-        # Mandatory custom fields
-        "lead_name": lead.name,
-        "custom_source": lead.source,
-        "custom_contact": contact,
+    doc.append("custom_bids", {
+        "sales_person": doc.custom_sales_person,
+        "status": "Approved" if doc.type == "Existing Customer" else "Applied",
+        "applied_on": frappe.utils.nowdate(),
+        "approved_by": frappe.session.user,
     })
 
-    # Sales person
-    if lead.custom_sales_person:
-        customer.append("sales_team", {
-            "sales_person": lead.custom_sales_person,
-            "allocation_percentage": 100
+def customer_creation_via_lead(doc):
+    try:
+        # Customer may not be created from Lead
+        if not doc.lead_name:
+            frappe.msgprint("No lead name provided", indicator="orange")
+            return
+
+        # Ensure Lead exists
+        if not frappe.db.exists("Lead", {"lead_name": doc.lead_name}):
+            frappe.msgprint(f"Lead {doc.lead_name} does not exist", indicator="red")
+            return
+
+        # Fix: Use doc.lead_name instead of doc.name
+        lead = frappe.get_doc("Lead", {"lead_name": doc.lead_name})
+
+        # Only for Qualified + New leads
+        if lead.status != "Qualified" or lead.type != "New":
+            return
+
+
+        # ---------- Existing customer check ----------
+        existing_customer = frappe.db.get_all(
+            "Customer",
+            filters={"customer_name": lead.lead_name, "custom_contact": lead.custom_contact},
+            limit_page_length=1
+        )
+
+        if existing_customer:
+            frappe.msgprint(
+                f"Customer {existing_customer[0].name} already exists for Lead {lead.name}",
+                indicator="orange"
+            )
+            return
+
+        # ---------- Create Customer ----------
+        customer = frappe.get_doc({
+            "doctype": "Customer",
+            "customer_name": lead.lead_name,
+            "customer_type": "Individual",
+            "customer_group": "All Customer Groups",
+            "territory": lead.territory or"All Territories",
+            "lead_name": lead.name,
+            "custom_source": lead.source,
+            "custom_contact": lead.custom_contact,
+            "custom_client_tiers": "Potential",
+            "custom_sales_person": lead.custom_sales_person,
+            "custom_customer_without_sales":1
         })
 
-    customer.insert(ignore_permissions=True)
+        if lead.custom_sales_person:
+            customer.append("sales_team", {
+                "sales_person": lead.custom_sales_person,
+                "allocated_percentage": 100
+            })
+
+        customer.insert(ignore_permissions=True)
+        frappe.db.commit()  # Ensure the transaction is committed
+        doc.db_set("customer", customer.name)
+        frappe.msgprint(
+            f"Customer {customer.name} created from Lead {lead.name}",
+            indicator="green"
+        )
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "Customer Creation via Lead")
+        frappe.msgprint(f"Error creating customer: {str(e)}", indicator="red")
+        raise  # Re-raise to see the full error
+
+
+
+@frappe.whitelist()
+def make_sales_invoice_from_lead(source_name, target_doc=None):
+    def set_missing_values(source, target):
+        target.customer = source.customer  # you decide
+        target.custom_source = source.source
+        target.custom_lead_ref = source.name
+        target.due_date = frappe.utils.add_days(
+            frappe.utils.nowdate(), 7
+        )
+
+
+    doc = get_mapped_doc(
+        "Lead",
+        source_name,
+        {
+            "Lead": {
+                "doctype": "Sales Invoice",
+                "field_map": {
+                    "name": "lead",
+                },
+            }
+        },
+        target_doc,
+        set_missing_values,
+    )
+
+    return doc

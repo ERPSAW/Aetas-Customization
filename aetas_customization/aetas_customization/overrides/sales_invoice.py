@@ -1,6 +1,7 @@
 import frappe
 import json
 from frappe import _
+
 def validate(self,method):
 
     if self.cost_center:
@@ -22,11 +23,18 @@ def validate(self,method):
             self.apply_discount_on = "Grand Total"
             frappe.msgprint(f"Coupon code not applicable, Reason: {coupon_data.get('message')}")
         self.calculate_taxes_and_totals()
-
+    
 def on_submit(self,method):
     """
     Called when Sales Invoice is submitted. Marks coupon as Used and updates redeemed amount.
     """
+    if self.custom_lead_ref:
+        frappe.db.set_value("Lead", self.custom_lead_ref, "custom_si_ref", self.name,update_modified=False)
+    
+    customer = frappe.db.get_value("Customer", self.customer, "custom_customer_without_sales")
+    if customer:
+        frappe.db.set_value("Customer", self.customer, "custom_customer_without_sales", 0,update_modified=False)
+
     if not getattr(self, "custom_aetas_coupon_code", None):
         return
 
@@ -59,6 +67,9 @@ def on_cancel(self,method):
     """
     Called when Sales Invoice is cancelled. Revert redeemed_amount and coupon status.
     """
+    if self.custom_lead_ref:
+        frappe.db.set_value("Lead", self.custom_lead_ref, "custom_si_ref", None,update_modified=False)
+
     if not getattr(self, "custom_aetas_coupon_code", None):
         return
 
@@ -75,6 +86,8 @@ def on_cancel(self,method):
     coupon.flags.ignore_permissions = True
     coupon.save()
     frappe.msgprint(_("Coupon Code marked as 'Active'"))
+
+    
 
 def update_mrp_values(self):
 

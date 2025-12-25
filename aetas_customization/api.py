@@ -36,7 +36,7 @@ def search_customers(name=None, email=None, mobile=None, txt=None, page=1, page_
     
     # 3. Search by Mobile (Contact Mobile)
     if mobile:
-        conditions.append("c.mobile_no LIKE %(mobile)s")
+        conditions.append("c.custom_contact LIKE %(mobile)s")
         values["mobile"] = f"%{mobile}%"
 
     where_clause = ""
@@ -66,7 +66,8 @@ def search_customers(name=None, email=None, mobile=None, txt=None, page=1, page_
         SELECT
             cust.name,
             cust.customer_name,
-            cust.custom_sales_person
+            cust.custom_sales_person,
+            cust.custom_contact
         {tables_clause}
         {where_clause}
         GROUP BY cust.name
