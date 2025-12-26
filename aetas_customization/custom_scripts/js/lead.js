@@ -1,23 +1,26 @@
 frappe.ui.form.on('Lead', {
     refresh: function (frm) {
+        // --- Standard Custom Buttons ---
         if (!frm.doc.customer) {
             frm.add_custom_button(__('Search Customer'), function () {
                 show_customer_search_dialog(frm);
             });
         }
 
-        if(!frm.doc.custom_si_ref && (frm.doc.status == 'Qualified' || frm.doc.status == 'Converted')){
-            frm.add_custom_button(__('Create Sales Invoice'), function() {
+        if (!frm.doc.custom_si_ref && (frm.doc.status == 'Qualified' || frm.doc.status == 'Converted')) {
+            frm.add_custom_button(__('Create Sales Invoice'), function () {
                 create_sales_invoice_from_lead(frm);
             });
         }
 
         setTimeout(() => {
-            frm.remove_custom_button('Customer','Create');
+            frm.remove_custom_button('Customer', 'Create');
         }, 10);
 
+        // --- Styles & Hooks ---
         frm.trigger("inject_approved_button_css");
-        frm.trigger("style_approved_buttons");
+        frm.trigger("setup_grid_observer"); // <--- NEW: Setup the watcher
+        frm.trigger("style_approved_buttons"); // Run once immediately
     },
 
     onload_post_render(frm) {
@@ -27,7 +30,6 @@ frappe.ui.form.on('Lead', {
 
     inject_approved_button_css(frm) {
         if (document.getElementById("approved-btn-style")) return;
-
         const style = document.createElement("style");
         style.id = "approved-btn-style";
         style.innerHTML = `
@@ -35,79 +37,89 @@ frappe.ui.form.on('Lead', {
                 background-color: #28a745 !important;
                 color: #fff !important;
                 border: none !important;
-                display: flex; justify-content: center; align-items: center; height: 30px!important;
-                width: auto;
+                display: flex; justify-content: center; align-items: center; 
+                height: 30px !important; width: auto; cursor: pointer;
             }
-
             button[data-fieldname="approved"]:hover {
                 background-color: #218838 !important;
-                color: #fff !important;
-                border: none !important;
-                display: flex; justify-content: center; align-items: center; height: 100%;
-            }
-
-            button[data-fieldname="approved"]:disabled {
-                background-color: #28a745 !important;
-                opacity: 0.85;
-                cursor: not-allowed;
             }
         `;
         document.head.appendChild(style);
     },
 
-    style_approved_buttons(frm) {
+    setup_grid_observer(frm) {
+        // This watches the grid for ANY changes (like row clicks/renders)
         if (!frm.fields_dict.custom_bids) return;
-
         const grid = frm.fields_dict.custom_bids.grid;
 
-        setTimeout(() => {
-            (grid.grid_rows || []).forEach(row => {
-                const d = row.doc;
+        // Only attach once
+        if (grid.wrapper.data('observer-attached')) return;
 
-                const $btn = $(row.wrapper)
-                    .find('button[data-fieldname="approved"]');
+        const observer = new MutationObserver((mutations) => {
+            // Re-apply styles whenever DOM changes
+            frm.trigger("style_approved_buttons");
+        });
 
-                if (!$btn.length) return;
+        observer.observe(grid.wrapper[0], {
+            childList: true, // Watch for added/removed rows
+            subtree: true    // Watch deeper (like button text changes inside rows)
+        });
 
-                if (d.status === "Approved") {
-                    $btn
-                        .text("Approved")
-                        .prop("disabled", true);
-                } else {
-                    $btn
-                        .text("Approve")
-                        .prop("disabled", false);
+        grid.wrapper.data('observer-attached', true);
+    },
+
+    style_approved_buttons(frm) {
+        if (!frm.fields_dict.custom_bids) return;
+        const grid = frm.fields_dict.custom_bids.grid;
+
+        (grid.grid_rows || []).forEach(row => {
+            const d = row.doc;
+            const $btn = $(row.wrapper).find('button[data-fieldname="approved"]');
+
+            if (!$btn.length) return;
+
+            if (d.status === "Approved") {
+                // If Approved: HIDE button
+                // Check visibility first to avoid infinite MutationObserver loops
+                if ($btn.is(":visible")) {
+                    $btn.hide();
+                    $btn.parent().hide();
                 }
-            });
-        }, 50);
-    }
-});
+            } else {
+                // If Not Approved: SHOW button and set text to "Approve"
+                if (!$btn.is(":visible")) {
+                    $btn.parent().show();
+                    $btn.show();
+                    $btn.css('display', 'flex');
+                }
 
-frappe.ui.form.on('Sales Person Bids', {
+                // CRITICAL: Force text to "Approve" if it reverted to default
+                if ($btn.text() !== "Approve") {
+                    $btn.text("Approve");
+                }
 
-    // Button click handler
-    approved(frm, cdt, cdn) {
-        const row = locals[cdt][cdn];
-
-        // Prevent re-approval
-        if (row.status === "Approved") {
-            frappe.show_alert({
-                message: __("Already approved"),
-                indicator: "orange"
-            });
-            return;
-        }
-
-        // Set status to Approved
-        frappe.model.set_value(cdt, cdn, "status", "Approved");
-
-        frappe.show_alert({
-            message: __("Bid Approved"),
-            indicator: "green"
+                if ($btn.prop("disabled")) {
+                    $btn.prop("disabled", false);
+                }
+            }
         });
     }
 });
 
+frappe.ui.form.on('Sales Person Bids', {
+    approved(frm, cdt, cdn) {
+        const row = locals[cdt][cdn];
+        if (row.status === "Approved") return;
+
+        frappe.model.set_value(cdt, cdn, "status", "Approved");
+        frappe.model.set_value(cdt, cdn, "approved_by", frappe.session.user);
+
+        frm.save().then(() => {
+            frappe.show_alert({ message: __("Bid Approved"), indicator: "green" });
+            // Observer will automatically handle the hiding now
+        });
+    }
+});
 
 function show_customer_search_dialog(frm) {
     // --- State Management ---
@@ -377,9 +389,9 @@ function show_customer_search_dialog(frm) {
             // Populate Form
             if (row.customer_name)
                 frm.set_value('first_name', row.customer_name);
-                frm.set_value('status','Open')
-                frm.set_value('type','Existing Customer')
-                frm.set_value('customer', row.name);
+            frm.set_value('status', 'Open')
+            frm.set_value('type', 'Existing Customer')
+            frm.set_value('customer', row.name);
 
             if (row.email_id)
                 frm.set_value('email_id', row.email_id);
@@ -387,7 +399,7 @@ function show_customer_search_dialog(frm) {
             let mobile = row.custom_contact || row.mobile_no;
             if (mobile)
                 frm.set_value('custom_contact', mobile);
-                frm.set_value('mobile_no', mobile);
+            frm.set_value('mobile_no', mobile);
 
             if (row.custom_sales_person && frm.fields_dict.custom_sales_person) {
                 frm.set_value('custom_sales_person', row.custom_sales_person);
