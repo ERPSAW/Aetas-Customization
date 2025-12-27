@@ -1,6 +1,5 @@
 [
  {
-  "_liked_by": "[\"Administrator\"]",
   "default_value": null,
   "doc_type": "Lead",
   "docstatus": 0,
@@ -17,7 +16,6 @@
   "value": "\nExisting Customer\nNew"
  },
  {
-  "_liked_by": "[\"Administrator\"]",
   "default_value": "Open",
   "doc_type": "Lead",
   "docstatus": 0,
@@ -34,7 +32,6 @@
   "value": "\nOpen\nConverted\nCold\nAssigned\nQualified\nUnQualified"
  },
  {
-  "_liked_by": "[\"Administrator\"]",
   "default_value": null,
   "doc_type": "Lead",
   "docstatus": 0,
@@ -51,7 +48,6 @@
   "value": "Open"
  },
  {
-  "_liked_by": "[\"Administrator\"]",
   "default_value": null,
   "doc_type": "Lead",
   "docstatus": 0,
@@ -68,7 +64,6 @@
   "value": ""
  },
  {
-  "_liked_by": "[\"Administrator\"]",
   "default_value": null,
   "doc_type": "Lead",
   "docstatus": 0,
@@ -85,7 +80,6 @@
   "value": "1"
  },
  {
-  "_liked_by": "[\"Administrator\"]",
   "default_value": null,
   "doc_type": "Lead",
   "docstatus": 0,
@@ -102,7 +96,6 @@
   "value": "1"
  },
  {
-  "_liked_by": "[\"Administrator\"]",
   "default_value": null,
   "doc_type": "Lead",
   "docstatus": 0,
