@@ -10,20 +10,22 @@ class AETASMaterialReceiptNote(Document):
 
 
 @frappe.whitelist()
-def get_purchase_orders(warehouse, supplier="", cost_center="", select_po_items=0):
+def get_purchase_orders(warehouse, purchase_order="", cost_center="", select_po_items=0):
     """Get Purchase Orders or PO Items based on warehouse and optional filters"""
 
     select_po_items = int(select_po_items)
 
     if select_po_items:
         # Return PO items instead of POs
-        return get_po_items_for_selection(warehouse, supplier, cost_center)
+        return get_po_items_for_selection(warehouse, purchase_order, cost_center)
     else:
         # Return POs as before
-        return get_pos_for_selection(warehouse, supplier, cost_center)
+        return get_pos_for_selection(warehouse, purchase_order, cost_center)
+    
 
 
-def get_pos_for_selection(warehouse, supplier="", cost_center=""):
+
+def get_pos_for_selection(warehouse, purchase_order="", cost_center=""):
     """Get Purchase Orders based on warehouse and optional filters"""
 
     # Base filters
@@ -34,8 +36,8 @@ def get_pos_for_selection(warehouse, supplier="", cost_center=""):
     }
 
     # Add optional supplier filter
-    if supplier:
-        filters["supplier"] = supplier
+    if purchase_order:
+        filters["name"] = purchase_order
 
     # If cost_center is provided, filter by PO cost_center OR PO items cost_center
     if cost_center:
@@ -60,7 +62,7 @@ def get_pos_for_selection(warehouse, supplier="", cost_center=""):
             {supplier_filter}
             ORDER BY po.transaction_date DESC
         """.format(
-                supplier_filter=f"AND po.supplier = '{supplier}'" if supplier else ""
+                supplier_filter=f"AND po.name = '{purchase_order}'" if purchase_order else ""
             ),
             {"warehouse": warehouse, "cost_center": cost_center},
             as_dict=1,
@@ -90,7 +92,7 @@ def get_pos_for_selection(warehouse, supplier="", cost_center=""):
         return pos
 
 
-def get_po_items_for_selection(warehouse, supplier="", cost_center=""):
+def get_po_items_for_selection(warehouse, purchase_order="", cost_center=""):
     """Get PO Items for selection based on filters"""
 
     # Build SQL query dynamically
@@ -98,8 +100,8 @@ def get_po_items_for_selection(warehouse, supplier="", cost_center=""):
     conditions.append("po.docstatus = 1")
     conditions.append("po.status IN ('To Receive', 'To Receive and Bill')")
 
-    if supplier:
-        conditions.append("po.supplier = %(supplier)s")
+    if purchase_order:
+        conditions.append("po.name = %(purchase_order)s")
 
     if cost_center:
         conditions.append(
@@ -124,7 +126,7 @@ def get_po_items_for_selection(warehouse, supplier="", cost_center=""):
 
     items = frappe.db.sql(
         query,
-        {"warehouse": warehouse, "supplier": supplier, "cost_center": cost_center},
+        {"warehouse": warehouse, "purchase_order": purchase_order, "cost_center": cost_center},
         as_dict=1,
     )
 
