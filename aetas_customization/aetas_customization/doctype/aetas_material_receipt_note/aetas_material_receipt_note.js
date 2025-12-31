@@ -26,44 +26,44 @@ frappe.ui.form.on('AETAS Material Receipt Note', {
         }
     },
 
-	location:function(frm){
-			frm.add_custom_button('Get MRN Items', () => {
-                frappe.call({
-                    method: 'frappe.client.get_value',
-                    args: {
-                        doctype: 'Boutique',
-                        filters: { name: frm.doc.location },
-                        fieldname: 'boutique_warehouse'
-                    },
-                    callback(r) {
-                        if (r.message?.boutique_warehouse) {
-                            show_po_dialog(frm, r.message.boutique_warehouse);
-                        } else {
-                            frappe.msgprint('Location not found for selected location');
-                        }
+    location: function (frm) {
+        frm.add_custom_button('Get MRN Items', () => {
+            frappe.call({
+                method: 'frappe.client.get_value',
+                args: {
+                    doctype: 'Boutique',
+                    filters: { name: frm.doc.location },
+                    fieldname: 'boutique_warehouse'
+                },
+                callback(r) {
+                    if (r.message?.boutique_warehouse) {
+                        show_po_dialog(frm, r.message.boutique_warehouse);
+                    } else {
+                        frappe.msgprint('Location not found for selected location');
                     }
-                });
+                }
             });
-		}
+        });
+    }
 });
 
 frappe.ui.form.on('MRN Item', {
-	// qty and rate field change event
-	mrn_item_add(frm, cdt, cdn) {
-		let row = frappe.get_doc(cdt, cdn);
-		row.amount = row.qty_ordered * row.rate;
-		frm.refresh_field('mrn_item');
-	},
-	qty_ordered(frm, cdt, cdn) {
-		let row = frappe.get_doc(cdt, cdn);
-		row.amount = row.qty_ordered * row.rate;
-		frm.refresh_field('mrn_item');
-	},
-	rate(frm, cdt, cdn) {
-		let row = frappe.get_doc(cdt, cdn);
-		row.amount = row.qty_ordered * row.rate;
-		frm.refresh_field('mrn_item');
-	}
+    // qty and rate field change event
+    mrn_item_add(frm, cdt, cdn) {
+        let row = frappe.get_doc(cdt, cdn);
+        row.amount = row.qty_ordered * row.rate;
+        frm.refresh_field('mrn_item');
+    },
+    qty_ordered(frm, cdt, cdn) {
+        let row = frappe.get_doc(cdt, cdn);
+        row.amount = row.qty_ordered * row.rate;
+        frm.refresh_field('mrn_item');
+    },
+    rate(frm, cdt, cdn) {
+        let row = frappe.get_doc(cdt, cdn);
+        row.amount = row.qty_ordered * row.rate;
+        frm.refresh_field('mrn_item');
+    }
 })
 
 
@@ -82,15 +82,15 @@ function show_po_dialog(frm, warehouse) {
                     reload_data(d);
                 }
             },
-            // {
-            //     label: 'Supplier',
-            //     fieldname: 'supplier',
-            //     fieldtype: 'Link',
-            //     options: 'Supplier',
-            //     onchange() {
-            //         reload_data(d);
-            //     }
-            // },
+            {
+                label: 'Purchase Order',
+                fieldname: 'purchase_order',
+                fieldtype: 'Link',
+                options: 'Purchase Order',
+                onchange() {
+                    reload_data(d);
+                }
+            },
             {
                 fieldtype: 'Column Break'
             },
@@ -130,7 +130,7 @@ function show_po_dialog(frm, warehouse) {
                         label: 'Purchase Order',
                         options: 'Purchase Order',
                         in_list_view: 1,
-						columns: 3,
+                        columns: 3,
                         read_only: 1
                     },
                     {
@@ -139,7 +139,7 @@ function show_po_dialog(frm, warehouse) {
                         label: 'Supplier',
                         options: 'Supplier',
                         in_list_view: 1,
-						columns: 2,
+                        columns: 2,
                         read_only: 1
                     }
                 ]
@@ -161,7 +161,7 @@ function show_po_dialog(frm, warehouse) {
                         label: 'Purchase Order',
                         options: 'Purchase Order',
                         in_list_view: 1,
-						columns: 2,
+                        columns: 2,
                         read_only: 1
                     },
                     {
@@ -170,7 +170,7 @@ function show_po_dialog(frm, warehouse) {
                         label: 'Item',
                         options: 'Item',
                         in_list_view: 1,
-						columns: 2,
+                        columns: 2,
                         read_only: 1
                     },
                     {
@@ -178,7 +178,7 @@ function show_po_dialog(frm, warehouse) {
                         fieldtype: 'Float',
                         label: 'Qty',
                         in_list_view: 1,
-						columns: 2,
+                        columns: 2,
                         read_only: 1
                     },
                     {
@@ -186,7 +186,7 @@ function show_po_dialog(frm, warehouse) {
                         fieldtype: 'Currency',
                         label: 'Amount',
                         in_list_view: 1,
-						columns: 2,
+                        columns: 2,
                         read_only: 1
                     }
                 ]
@@ -234,7 +234,7 @@ function reload_data(dialog) {
                 method: 'aetas_customization.aetas_customization.doctype.aetas_material_receipt_note.aetas_material_receipt_note.get_purchase_orders',
                 args: {
                     warehouse: r.message.boutique_warehouse,
-                    supplier: values.supplier || '',
+                    purchase_order: values.purchase_order || '',
                     cost_center: values.cost_center || '',
                     select_po_items: values.select_po_item ? 1 : 0
                 },
@@ -262,8 +262,6 @@ function handle_item_selection(frm, dialog) {
             if (!po) {
                 po = r.purchase_order;
                 supplier = r.supplier;   // must come from backend
-            } else if (po !== r.purchase_order) {
-                frappe.throw('Select items from only one Purchase Order');
             }
             selected.push(r);
         }
@@ -275,9 +273,7 @@ function handle_item_selection(frm, dialog) {
     }
 
     // ✅ SET DOC LEVEL FIELDS (IMPORTANT)
-    frm.set_value('po_number', po);
-    frm.set_value('supplier_name', supplier);
-	frm.set_value('location', dialog.get_value('location'));
+    frm.set_value('location', dialog.get_value('location'));
 
     // Clear & add items
     frm.clear_table('mrn_item');
@@ -289,6 +285,8 @@ function handle_item_selection(frm, dialog) {
         row.qty_ordered = i.qty;
         row.rate = i.rate;
         row.amount = i.amount;
+		row.purchase_order = i.purchase_order;
+		row.supplier = supplier;
     });
 
     frm.refresh_field('mrn_item');
@@ -323,13 +321,13 @@ function handle_po_selection(frm, dialog) {
                 row.item = i.item_code;
                 row.qty_ordered = i.quantity;
                 row.rate = i.rate;
-				row.uom = i.uom;
+                row.uom = i.uom;
                 row.amount = i.amount;
+				row.purchase_order = i.purchase_order;
+				row.supplier = supplier;
             });
             frm.refresh_field('mrn_item');
-			frm.set_value('supplier_name', selected[0].supplier);
-			frm.set_value('po_number', selected[0].name);
-			frm.set_value('location', dialog.get_value('location'));
+            frm.set_value('location', dialog.get_value('location'));
             dialog.hide();
         }
     });
