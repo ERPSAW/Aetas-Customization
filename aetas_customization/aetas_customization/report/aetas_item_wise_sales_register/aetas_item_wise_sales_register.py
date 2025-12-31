@@ -165,7 +165,7 @@ def _execute(filters=None, additional_table_columns=None, additional_query_colum
 	
 	get_purchase_rate(data)
 	get_customer_type(data)
-	data = merge_duplicate_items(data)
+	# data = merge_duplicate_items(data)
 
 	customer_type_filter = filters.get("customer_type")
 	if customer_type_filter:
