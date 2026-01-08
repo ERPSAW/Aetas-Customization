@@ -1,20 +1,38 @@
 frappe.ui.form.on('Lead', {
     before_save: function (frm) {
-        let bids = frm.doc.custom_bids || [];
-        let is_any_approved = bids.some(row => row.status == "Approved");
-        // Check conditions and ensure we haven't already handled this to avoid loops
-        if (frm.doc.status == "Qualified" && frm.doc.custom_sales_person && !frm.doc.__assignment_handled && !is_any_approved) {
-
-            // 1. Stop the immediate save
+        // --- LOGIC 1: Unqualified Status (Prompt for Reason) ---
+        if (frm.doc.status == "UnQualified" && !frm.doc.__unqualified_handled) {
+            // 1. Stop immediate save
             frappe.validated = false;
 
-            // 2. Call the Promise function
+            // 2. Call Promise
+            prompt_unqualified_reason(frm).then(() => {
+                frm.doc.__unqualified_handled = true;
+                frm.save();
+            }).catch(() => {
+                // User cancelled the dialog, save remains stopped
+                console.log("User cancelled the dialog, save remains stopped");
+            });
+
+            // Return here so we don't trigger the Qualified logic simultaneously
+            return;
+        }
+
+        // --- LOGIC 2: Qualified Status (Assign Sales Person) ---
+        let bids = frm.doc.custom_bids || [];
+        let is_any_approved = bids.some(row => row.status == "Approved");
+
+        if (frm.doc.status == "Qualified" && frm.doc.custom_sales_person && !frm.doc.__assignment_handled && !is_any_approved) {
+
+            // 1. Stop immediate save
+            frappe.validated = false;
+
+            // 2. Call Promise
             validate_and_assign_sales_person(frm).then(() => {
-                // Success: Set flag and re-save
                 frm.doc.__assignment_handled = true;
                 frm.save();
             }).catch(() => {
-                // Failure: Do nothing (save stays stopped)
+                // User cancelled or closed dialog
             });
         }
     },
@@ -143,6 +161,50 @@ frappe.ui.form.on('Lead', {
     }
 });
 
+function add_bid_row(frm, sales_person) {
+    let row = frm.add_child("custom_bids");
+
+    if (sales_person) {
+        row.sales_person = sales_person;
+    } else {
+        // Logic for "Open for All" - maybe leave sales_person empty?
+        row.sales_person = "";
+    }
+
+    row.status = (frm.doc.type == "Existing Customer") ? "Approved" : "Applied";
+    row.applied_on = frappe.datetime.get_today();
+    row.approved_by = frappe.session.user;
+
+    frm.refresh_field("custom_bids");
+}
+
+// --- HELPER FUNCTION: Prompt for Unqualified Reason ---
+function prompt_unqualified_reason(frm) {
+    return new Promise((resolve, reject) => {
+        let d = new frappe.ui.Dialog({
+            title: __('Unqualified Reason'),
+            fields: [
+                {
+                    label: __('Reason'),
+                    fieldname: 'reason',
+                    fieldtype: 'Small Text',
+                    reqd: 1,
+                    description: "Please specify why this lead is unqualified."
+                }
+            ],
+            primary_action_label: __('Submit'),
+            primary_action: function (values) {
+                // Save reason to a custom field (Ensure 'custom_unqualified_reason' exists in DocType)
+                frm.doc.custom_unqualified_reason = values.reason;
+                d.hide();
+                console.log("Unqualified Reason: ", values.reason);
+                resolve(); // Proceed with Save
+            },
+        });
+        d.show();
+    });
+}
+
 function validate_and_assign_sales_person(frm) {
     return new Promise(function (resolve, reject) {
 
@@ -152,33 +214,36 @@ function validate_and_assign_sales_person(frm) {
         );
 
         if (already_exists) {
-            // If already exists, just proceed without asking
             resolve();
             return;
         }
 
-        // 2. Ask for Confirmation
-        frappe.confirm(
-            __("Do you want to assign Sales Person <b>{0}</b> to this Lead or Open for all?", [frm.doc.custom_sales_person]),
-
-            // YES: Add row and Resolve
-            function () {
-                let row = frm.add_child("custom_bids");
-                row.sales_person = frm.doc.custom_sales_person;
-                row.status = (frm.doc.type == "Existing Customer") ? "Approved" : "Applied";
-                row.applied_on = frappe.datetime.get_today();
-                row.approved_by = frappe.session.user;
-
-                frm.refresh_field("custom_bids");
-
+        // 2. Custom Dialog
+        let d = new frappe.ui.Dialog({
+            title: __('Assign Sales Person'),
+            fields: [
+                {
+                    fieldtype: 'HTML',
+                    options: `<p>Do you want to assign <b>${frm.doc.custom_sales_person}</b> to this Lead or keep it Open for All?</p>`
+                }
+            ],
+            // Button 1: Specific Sales Person
+            primary_action_label: __('This Sales Person'),
+            primary_action: function () {
+                add_bid_row(frm, frm.doc.custom_sales_person); // Pass specific person
+                d.hide();
                 resolve();
             },
-
-            // NO: Reject (Cancel Save)
-            function () {
+            // Button 2: Open For All
+            secondary_action_label: __('Open for All'),
+            secondary_action: function () {
+                frm.doc.custom_sales_person = "";
+                d.hide();
                 resolve();
             }
-        );
+        });
+
+        d.show();
     });
 }
 
