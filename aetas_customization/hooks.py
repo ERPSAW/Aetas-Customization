@@ -1,5 +1,3 @@
-from . import __version__ as app_version
-
 app_name = "aetas_customization"
 app_title = "Aetas Customization"
 app_publisher = "Akhilam Inc"
@@ -9,31 +7,68 @@ app_license = "MIT"
 
 
 fixtures = [
-    {"dt": "Custom Field", "filters": [
-        [
-            "name", "in", [
-                "Purchase Invoice Item-margin_custom","Serial No-mrp","Sales Invoice-custom_source",
-                "Payment Reconciliation Invoice-custom_bill_no","Stock Entry-custom_delivery_note","Stock Entry Detail-custom_mrp",
-                "Payment Entry-custom_advance_payment_receipt","Cost Center-custom_letter_head",
-                "Item Group-custom_unique_code","Item Group-custom_attribute_2","Item-custom_enable_dynamic_sn_naming",
-                "Item-custom_attribute_3","Warehouse-custom_store_code",
-                "Sales Invoice-custom_aetas_coupon_code","Lead-custom_itemservice","Lead-custom_brand","Lead-custom_model",
-                "Lead-custom_preferred_store","Lead-custom_date","Lead-custom_proppsed_bids","Lead-custom_bids","Lead-custom_sales_person",
-                "Sales Invoice-custom_lead_ref","Lead-custom_si_ref","Lead-custom_cold_description","Lead-custom_contact","Customer-custom_customer_without_sales"
+    {
+        "dt": "Custom Field",
+        "filters": [
+            [
+                "name",
+                "in",
+                [
+                    "Purchase Invoice Item-margin_custom",
+                    "Serial No-mrp",
+                    "Sales Invoice-custom_source",
+                    "Payment Reconciliation Invoice-custom_bill_no",
+                    "Stock Entry-custom_delivery_note",
+                    "Stock Entry Detail-custom_mrp",
+                    "Payment Entry-custom_advance_payment_receipt",
+                    "Cost Center-custom_letter_head",
+                    "Item Group-custom_unique_code",
+                    "Item Group-custom_attribute_2",
+                    "Item-custom_enable_dynamic_sn_naming",
+                    "Item-custom_attribute_3",
+                    "Warehouse-custom_store_code",
+                    "Sales Invoice-custom_aetas_coupon_code",
+                    "Lead-custom_itemservice",
+                    "Lead-custom_brand",
+                    "Lead-custom_model",
+                    "Lead-custom_preferred_store",
+                    "Lead-custom_date",
+                    "Lead-custom_proppsed_bids",
+                    "Lead-custom_bids",
+                    "Lead-custom_sales_person",
+                    "Sales Invoice-custom_lead_ref",
+                    "Lead-custom_si_ref",
+                    "Lead-custom_cold_description",
+                    "Lead-custom_contact",
+                    "Customer-custom_customer_without_sales",
+                    "Lead-custom_unqualified_reason",
+                    "",
+                ],
             ]
-        ]
-    ]},
-     {"dt": "Property Setter", "filters": [
-        [
-            "name", "in", [
-                "Customer-mobile_no-in_standard_filter"
-                "Purchase Invoice Item-margin_custom","Serial No-mrp",
-                "Payment Reconciliation Invoice-custom_bill_no",
-                "Lead-type-options","Lead-status-options","Lead-status-default","Lead-customer-depends_on",
-                "Lead-contact_info_tab-hidden","Lead-organization_section-hidden","Lead-main-field_order"
+        ],
+    },
+    {
+        "dt": "Property Setter",
+        "filters": [
+            [
+                "name",
+                "in",
+                [
+                    "Customer-mobile_no-in_standard_filter"
+                    "Purchase Invoice Item-margin_custom",
+                    "Serial No-mrp",
+                    "Payment Reconciliation Invoice-custom_bill_no",
+                    "Lead-type-options",
+                    "Lead-status-options",
+                    "Lead-status-default",
+                    "Lead-customer-depends_on",
+                    "Lead-contact_info_tab-hidden",
+                    "Lead-organization_section-hidden",
+                    "Lead-main-field_order",
+                ],
             ]
-        ]
-    ]}
+        ],
+    },
 ]
 
 # Includes in <head>
@@ -60,12 +95,12 @@ fixtures = [
 # include js in doctype views
 # doctype_js = {"doctype" : "public/js/doctype.js"}
 doctype_js = {
-    "Purchase Invoice" : "custom_scripts/js/purchase_invoice.js",
-    "Payment Reconciliation" : "custom_scripts/js/payment_reconciliation.js",
-    "Payment Entry":"custom_scripts/js/payment_entry.js",
-    "Sales Invoice":"custom_scripts/js/sales_invoice.js",
-    "Purchase Order":"custom_scripts/js/purchase_order.js",
-    "Lead":"custom_scripts/js/lead.js"
+    "Purchase Invoice": "custom_scripts/js/purchase_invoice.js",
+    "Payment Reconciliation": "custom_scripts/js/payment_reconciliation.js",
+    "Payment Entry": "custom_scripts/js/payment_entry.js",
+    "Sales Invoice": "custom_scripts/js/sales_invoice.js",
+    "Purchase Order": "custom_scripts/js/purchase_order.js",
+    "Lead": "custom_scripts/js/lead.js",
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -79,7 +114,7 @@ doctype_js = {
 
 # website user home page (by Role)
 # role_home_page = {
-#	"Role": "home_page"
+# "Role": "home_page"
 # }
 
 # Generators
@@ -93,8 +128,8 @@ doctype_js = {
 
 # add methods and filters to jinja environment
 # jinja = {
-#	"methods": "aetas_customization.utils.jinja_methods",
-#	"filters": "aetas_customization.utils.jinja_filters"
+# "methods": "aetas_customization.utils.jinja_methods",
+# "filters": "aetas_customization.utils.jinja_filters"
 # }
 
 # Installation
@@ -120,11 +155,11 @@ doctype_js = {
 # Permissions evaluated in scripted ways
 
 # permission_query_conditions = {
-#	"Event": "frappe.desk.doctype.event.event.get_permission_query_conditions",
+# "Event": "frappe.desk.doctype.event.event.get_permission_query_conditions",
 # }
 #
 # has_permission = {
-#	"Event": "frappe.desk.doctype.event.event.has_permission",
+# "Event": "frappe.desk.doctype.event.event.has_permission",
 # }
 
 # DocType Class
@@ -132,7 +167,7 @@ doctype_js = {
 # Override standard doctype classes
 
 override_doctype_class = {
-	"Payment Reconciliation": "aetas_customization.overrides.payment_reconciliation.CustomPaymentReconciliation"
+    "Payment Reconciliation": "aetas_customization.overrides.payment_reconciliation.CustomPaymentReconciliation"
 }
 
 # Document Events
@@ -140,56 +175,56 @@ override_doctype_class = {
 # Hook on document methods and events
 
 doc_events = {
-	"Purchase Invoice": {
-        "before_validate":"aetas_customization.aetas_customization.overrides.purchase_invoice.before_validate",
-		"on_submit": "aetas_customization.aetas_customization.overrides.purchase_invoice.on_submit",
-	},
-    "Sales Invoice": {
-		"validate": "aetas_customization.aetas_customization.overrides.sales_invoice.validate",
-		"on_submit": "aetas_customization.aetas_customization.overrides.sales_invoice.on_submit",
-		"on_cancel": "aetas_customization.aetas_customization.overrides.sales_invoice.on_cancel",
-	},
-    "Payment Entry": {
-		"on_submit": "aetas_customization.aetas_customization.overrides.payment_entry.on_submit",
-	},
-    "Stock Entry":{
-        "before_validate":"aetas_customization.aetas_customization.overrides.stock_entry.before_validate",
+    "Purchase Invoice": {
+        "before_validate": "aetas_customization.aetas_customization.overrides.purchase_invoice.before_validate",
+        "on_submit": "aetas_customization.aetas_customization.overrides.purchase_invoice.on_submit",
     },
-    "Item":{
+    "Sales Invoice": {
+        "validate": "aetas_customization.aetas_customization.overrides.sales_invoice.validate",
+        "on_submit": "aetas_customization.aetas_customization.overrides.sales_invoice.on_submit",
+        "on_cancel": "aetas_customization.aetas_customization.overrides.sales_invoice.on_cancel",
+    },
+    "Payment Entry": {
+        "on_submit": "aetas_customization.aetas_customization.overrides.payment_entry.on_submit",
+    },
+    "Stock Entry": {
+        "before_validate": "aetas_customization.aetas_customization.overrides.stock_entry.before_validate",
+    },
+    "Item": {
         "validate": "aetas_customization.aetas_customization.overrides.item.validate",
     },
-    "Item Group":{
+    "Item Group": {
         "validate": "aetas_customization.aetas_customization.overrides.item_group.validate",
     },
-    "Warehouse":{
+    "Warehouse": {
         "validate": "aetas_customization.aetas_customization.overrides.warehouse.validate",
     },
-    "Lead":{
-        "after_insert":"aetas_customization.overrides.lead.after_insert",
-        "on_update":"aetas_customization.overrides.lead.on_update",
-        "validate":"aetas_customization.overrides.lead.validate",
-    }
+    "Lead": {
+        "after_insert": "aetas_customization.overrides.lead.after_insert",
+        "on_update": "aetas_customization.overrides.lead.on_update",
+        "validate": "aetas_customization.overrides.lead.validate",
+    },
 }
 
 # Scheduled Tasks
 # ---------------
 
 # scheduler_events = {
-#	"all": [
-#		"aetas_customization.tasks.all"
-#	],
-#	"daily": [
-#		"aetas_customization.tasks.daily"
-#	],
-#	"hourly": [
-#		"aetas_customization.tasks.hourly"
-#	],
-#	"weekly": [
-#		"aetas_customization.tasks.weekly"
-#	],
-#	"monthly": [
-#		"aetas_customization.tasks.monthly"
-#	],
+# "all": [
+# "aetas_customization.tasks.all"
+# ],
+# "daily": [
+# "aetas_customization.tasks.daily"
+# ],
+# "hourly": [
+# "aetas_customization.tasks.hourly"
+# ],
+# "weekly": [
+# "aetas_customization.tasks.weekly"
+# ],
+# "monthly": [
+# "aetas_customization.tasks.monthly"
+# ],
 # }
 
 # Testing
@@ -201,14 +236,14 @@ doc_events = {
 # ------------------------------
 #
 # override_whitelisted_methods = {
-#	"frappe.desk.doctype.event.event.get_events": "aetas_customization.event.get_events"
+# "frappe.desk.doctype.event.event.get_events": "aetas_customization.event.get_events"
 # }
 #
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,
 # along with any modifications made in other Frappe apps
 # override_doctype_dashboards = {
-#	"Task": "aetas_customization.task.get_dashboard_data"
+# "Task": "aetas_customization.task.get_dashboard_data"
 # }
 
 # exempt linked doctypes from being automatically cancelled
@@ -225,29 +260,29 @@ doc_events = {
 # --------------------
 
 # user_data_fields = [
-#	{
-#		"doctype": "{doctype_1}",
-#		"filter_by": "{filter_by}",
-#		"redact_fields": ["{field_1}", "{field_2}"],
-#		"partial": 1,
-#	},
-#	{
-#		"doctype": "{doctype_2}",
-#		"filter_by": "{filter_by}",
-#		"partial": 1,
-#	},
-#	{
-#		"doctype": "{doctype_3}",
-#		"strict": False,
-#	},
-#	{
-#		"doctype": "{doctype_4}"
-#	}
+# {
+# "doctype": "{doctype_1}",
+# "filter_by": "{filter_by}",
+# "redact_fields": ["{field_1}", "{field_2}"],
+# "partial": 1,
+# },
+# {
+# "doctype": "{doctype_2}",
+# "filter_by": "{filter_by}",
+# "partial": 1,
+# },
+# {
+# "doctype": "{doctype_3}",
+# "strict": False,
+# },
+# {
+# "doctype": "{doctype_4}"
+# }
 # ]
 
 # Authentication and authorization
 # --------------------------------
 
 # auth_hooks = [
-#	"aetas_customization.auth.validate"
+# "aetas_customization.auth.validate"
 # ]

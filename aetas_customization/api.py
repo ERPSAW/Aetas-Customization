@@ -1,5 +1,7 @@
-import frappe
 import math
+
+import frappe
+
 
 @frappe.whitelist()
 def search_customers(name=None, email=None, mobile=None, txt=None, page=1, page_len=20):
@@ -26,17 +28,21 @@ def search_customers(name=None, email=None, mobile=None, txt=None, page=1, page_
 
     # 1. Search by Name (Customer Name or ID)
     if search_name:
-        conditions.append("(cust.customer_name LIKE %(name)s OR cust.name LIKE %(name)s)")
+        conditions.append(
+            "(cust.customer_name LIKE %(name)s OR cust.name LIKE %(name)s)"
+        )
         values["name"] = f"%{search_name}%"
-    
+
     # 2. Search by Email (Contact Email)
     if email:
         conditions.append("c.email_id LIKE %(email)s")
         values["email"] = f"%{email}%"
-    
+
     # 3. Search by Mobile (Contact Mobile)
     if mobile:
-        conditions.append("c.custom_contact LIKE %(mobile)s")
+        conditions.append(
+            "(c.mobile_no LIKE %(mobile)s OR c.phone LIKE %(mobile)s or cust.custom_contact LIKE %(mobile)s)"
+        )
         values["mobile"] = f"%{mobile}%"
 
     where_clause = ""
@@ -55,7 +61,7 @@ def search_customers(name=None, email=None, mobile=None, txt=None, page=1, page_
             "total_count": 0,
             "total_pages": 0,
             "page": page,
-            "page_len": page_len
+            "page_len": page_len,
         }
 
     # --- Step 2: Fetch Paginated Data ---
@@ -73,14 +79,15 @@ def search_customers(name=None, email=None, mobile=None, txt=None, page=1, page_
         GROUP BY cust.name
         LIMIT %(page_len)s OFFSET %(offset)s
     """
-    
+
     customers = frappe.db.sql(data_query, values, as_dict=True)
-    
+
     final_data = []
 
     for cust in customers:
         # Fetch Primary Contact Details for the found customer
-        contact_info = frappe.db.sql("""
+        contact_info = frappe.db.sql(
+            """
             SELECT c.email_id, c.mobile_no
             FROM `tabContact` c
             INNER JOIN `tabDynamic Link` dl ON dl.parent = c.name
@@ -88,10 +95,13 @@ def search_customers(name=None, email=None, mobile=None, txt=None, page=1, page_
                 AND dl.link_name = %s
                 AND c.is_primary_contact = 1
             LIMIT 1
-        """, cust.name, as_dict=True)
+        """,
+            cust.name,
+            as_dict=True,
+        )
 
         contact_info = contact_info[0] if contact_info else {}
-        
+
         # Merge contact info into customer data
         cust.update(contact_info)
         final_data.append(cust)
@@ -103,5 +113,5 @@ def search_customers(name=None, email=None, mobile=None, txt=None, page=1, page_
         "total_count": total_count,
         "total_pages": total_pages,
         "page": page,
-        "page_len": page_len
+        "page_len": page_len,
     }
