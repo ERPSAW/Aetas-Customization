@@ -42,7 +42,6 @@ fixtures = [
                     "Lead-custom_contact",
                     "Customer-custom_customer_without_sales",
                     "Lead-custom_unqualified_reason",
-                    "",
                 ],
             ]
         ],
