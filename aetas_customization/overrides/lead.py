@@ -1,5 +1,34 @@
 import frappe
+from erpnext.crm.doctype.lead.lead import Lead
 from frappe.model.mapper import get_mapped_doc
+
+
+class CustomLead(Lead):
+    def validate(self):
+        """
+        Override Lead.validate()
+        """
+
+        # 🔹 Call core logic FIRST (recommended)
+        super().set_full_name()
+        super().set_lead_name()
+        super().set_title()
+        self.custom_set_status()
+        super().check_email_id_is_unique()
+        super().validate_email_id()
+
+        # 🔥 Your custom logic AFTER core validate
+        self.custom_set_status()
+
+    def custom_set_status(self):
+        """
+        Your overridden status logic
+        """
+
+        if self.customer:
+            self.status = "Qualified"
+        if self.custom_si_ref:
+            self.status = "Converted"
 
 
 def after_insert(doc, method):

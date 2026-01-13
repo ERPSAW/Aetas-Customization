@@ -166,7 +166,9 @@ doctype_js = {
 # Override standard doctype classes
 
 override_doctype_class = {
-    "Payment Reconciliation": "aetas_customization.overrides.payment_reconciliation.CustomPaymentReconciliation"
+    "Payment Reconciliation": "aetas_customization.overrides.payment_reconciliation.CustomPaymentReconciliation",
+    "Customer":"aetas_customization.overrides.customer.CustomCustomer",
+    "Lead":"aetas_customization.overrides.lead.CustomLead"
 }
 
 # Document Events
