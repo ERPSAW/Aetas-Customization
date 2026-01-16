@@ -25,7 +25,7 @@ class CustomLead(Lead):
         Your overridden status logic
         """
 
-        if self.customer:
+        if self.customer and not self.custom_cold_description:
             self.status = "Qualified"
         if self.custom_si_ref:
             self.status = "Converted"

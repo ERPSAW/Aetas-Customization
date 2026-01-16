@@ -557,7 +557,7 @@ function approve_sales_person(frm, sales_person_name) {
         // 2. Update Status
         frappe.model.set_value(row.doctype, row.name, 'status', 'Approved');
         frappe.model.set_value(row.doctype, row.name, 'approved_by', frappe.session.user);
-
+        frm.set_value("custom_sales_person", sales_person_name);
         // 3. Save
         frm.save().then(() => {
             frappe.dom.unfreeze();
