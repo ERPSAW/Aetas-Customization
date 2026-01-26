@@ -2,3 +2,4 @@
 
 [post_model_sync]
 aetas_customization.aetas_customization.patches.add_property_setter
+aetas_customization.aetas_customization.patches.update_contact_emails

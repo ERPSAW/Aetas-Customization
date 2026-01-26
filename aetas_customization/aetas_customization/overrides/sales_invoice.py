@@ -14,6 +14,14 @@ def validate(self, method):
                 f"Letter Head must be <b>{letter_head}</b> for Cost Center - {self.cost_center}"
             )
 
+    customer_email_id = frappe.db.get_value("Customer", self.customer, "custom_email")
+    if not customer_email_id:
+        frappe.throw(
+            _("Customer Email ID is not set for Customer - <b>{0}</b>").format(
+                self.customer
+            )
+        )
+
     update_mrp_values(self)
     if self.custom_aetas_coupon_code:
         total = (
@@ -48,6 +56,17 @@ def validate(self, method):
                 f"Coupon code not applicable, Reason: {coupon_data.get('message')}"
             )
         self.calculate_taxes_and_totals()
+
+
+def before_submit(self, method):
+    if self.rounded_total >= 200000:
+        customer_pan_card = frappe.db.get_value("Customer", self.customer, "pan")
+        if not customer_pan_card:
+            frappe.throw(
+                _("Customer PAN Card is not set for Customer - <b>{0}</b>").format(
+                    self.customer
+                )
+            )
 
 
 def on_submit(self, method):

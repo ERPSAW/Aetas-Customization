@@ -167,8 +167,8 @@ doctype_js = {
 
 override_doctype_class = {
     "Payment Reconciliation": "aetas_customization.overrides.payment_reconciliation.CustomPaymentReconciliation",
-    "Customer":"aetas_customization.overrides.customer.CustomCustomer",
-    "Lead":"aetas_customization.overrides.lead.CustomLead"
+    "Customer": "aetas_customization.overrides.customer.CustomCustomer",
+    "Lead": "aetas_customization.overrides.lead.CustomLead",
 }
 
 # Document Events
@@ -182,6 +182,7 @@ doc_events = {
     },
     "Sales Invoice": {
         "validate": "aetas_customization.aetas_customization.overrides.sales_invoice.validate",
+        "before_submit": "aetas_customization.aetas_customization.overrides.sales_invoice.before_submit",
         "on_submit": "aetas_customization.aetas_customization.overrides.sales_invoice.on_submit",
         "on_cancel": "aetas_customization.aetas_customization.overrides.sales_invoice.on_cancel",
     },
