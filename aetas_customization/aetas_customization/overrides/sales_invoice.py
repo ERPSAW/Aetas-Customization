@@ -1,5 +1,4 @@
 import json
-
 import frappe
 from frappe import _
 
@@ -17,7 +16,7 @@ def validate(self, method):
     customer_email_id = frappe.db.get_value("Customer", self.customer, "custom_email")
     if not customer_email_id:
         frappe.throw(
-            _("Customer Email ID is not set for Customer - <b>{0}</b>").format(
+            _("Please set Email ID in Customer, in-order to Proceed with Invoice - <b>{0}</b>").format(
                 self.customer
             )
         )
@@ -63,8 +62,9 @@ def before_submit(self, method):
         customer_pan_card = frappe.db.get_value("Customer", self.customer, "pan")
         if not customer_pan_card:
             frappe.throw(
-                _("Customer PAN Card is not set for Customer - <b>{0}</b>").format(
-                    self.customer
+                _("Please set PAN Card in Customer. PAN Card is required for invoices with amount 200000 and above - <b>{0}</b> (Amount: <b>{1}</b>)").format(
+                    self.customer,
+                    frappe.format_value(self.rounded_total, dict(fieldtype='Currency'))
                 )
             )
 
