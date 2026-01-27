@@ -72,29 +72,28 @@ def get_data(filters):
 
 		# 2) STOCK ENTRY → MATERIAL RECEIPT → CONSIGNMENT → PAID
 		if not status:
-			se_detail = frappe.db.get_value(
+			se_details = frappe.db.get_all(
 				"Stock Entry Detail",
-				{
+				filters={
 					"item_code": item_code,
 					"serial_no": ["like", f"%{sn}%"],
 				},
-				"parent",
+				pluck="parent"
 			)
 
-			if se_detail:
-				se = frappe.db.get_value(
+			if se_details:
+				stock_entries = frappe.db.get_all(
 					"Stock Entry",
-					se_detail,
-					["stock_entry_type", "type_of_stocks", "docstatus"],
-					as_dict=True,
+					filters={
+						"name": ["in", se_details],
+						"docstatus": 1,
+						"stock_entry_type": "Material Receipt",
+						"type_of_stocks": "Consignment",
+					},
+					fields=["name"]
 				)
 
-				if (
-					se
-					and se.docstatus == 1
-					and se.stock_entry_type == "Material Receipt"
-					and se.type_of_stocks == "Consignment"
-				):
+				if stock_entries:
 					status = "Paid"
 
 		# -------------------------
