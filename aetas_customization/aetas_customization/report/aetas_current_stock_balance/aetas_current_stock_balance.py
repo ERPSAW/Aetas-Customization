@@ -94,7 +94,7 @@ def get_data(filters):
 				)
 
 				if stock_entries:
-					status = "Paid"
+					status = "Consignment"
 
 		# -------------------------
 		# RATE & MRP LOGIC
