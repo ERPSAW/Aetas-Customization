@@ -49,9 +49,56 @@ def get_data(filters):
 		purchase_rate = 0
 
 		doc_no = serial_no.purchase_document_no
+		status = ""
 		sn = serial_no.name
 		item_code = serial_no.item_code
 
+		# -------------------------
+		# STATUS LOGIC
+		# -------------------------
+
+		# 1) PURCHASE INVOICE → PAID
+		pi_exists = frappe.db.exists(
+			"Purchase Invoice Item",
+			{
+				"item_code": item_code,
+				"serial_no": ["like", f"%{sn}%"],
+				"docstatus": 1,
+			},
+		)
+
+		if pi_exists:
+			status = "Paid"
+
+		# 2) STOCK ENTRY → MATERIAL RECEIPT → CONSIGNMENT → PAID
+		if not status:
+			se_details = frappe.db.get_all(
+				"Stock Entry Detail",
+				filters={
+					"item_code": item_code,
+					"serial_no": ["like", f"%{sn}%"],
+				},
+				pluck="parent"
+			)
+
+			if se_details:
+				stock_entries = frappe.db.get_all(
+					"Stock Entry",
+					filters={
+						"name": ["in", se_details],
+						"docstatus": 1,
+						"stock_entry_type": "Material Receipt",
+						"type_of_stocks": "Consignment",
+					},
+					fields=["name"]
+				)
+
+				if stock_entries:
+					status = "Paid"
+
+		# -------------------------
+		# RATE & MRP LOGIC
+		# -------------------------
 		if doc_no:
 
 			# 1) STOCK ENTRY DETAIL (highest priority)
@@ -108,6 +155,7 @@ def get_data(filters):
 		# Build the row for each serial number
 		row = {
 			"creation_date": getdate(serial_no.creation),
+			"status": status,
 			"name": serial_no.name,
 			"item_code": serial_no.item_code,
 			"item_name": serial_no.item_name,
@@ -133,6 +181,12 @@ def get_columns(filters):
 			"fieldname": "creation_date",
 			"fieldtype": "Date",
 			"width": 100
+		},
+		{
+			"label":"Status",
+			"fieldname":"status",
+			"fieldtype":"Data",
+			"width":100
 		},
 		{
 			"label": "Item Code",

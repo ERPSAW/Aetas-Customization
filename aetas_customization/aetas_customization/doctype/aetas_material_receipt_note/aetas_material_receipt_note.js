@@ -48,24 +48,33 @@ frappe.ui.form.on('AETAS Material Receipt Note', {
 });
 
 frappe.ui.form.on('MRN Item', {
-    // qty and rate field change event
     mrn_item_add(frm, cdt, cdn) {
-        let row = frappe.get_doc(cdt, cdn);
-        row.amount = row.qty_ordered * row.rate;
-        frm.refresh_field('mrn_item');
+        calculate_amount(frm, cdt, cdn);
     },
     qty_ordered(frm, cdt, cdn) {
-        let row = frappe.get_doc(cdt, cdn);
-        row.amount = row.qty_ordered * row.rate;
-        frm.refresh_field('mrn_item');
+        calculate_amount(frm, cdt, cdn);
     },
     rate(frm, cdt, cdn) {
-        let row = frappe.get_doc(cdt, cdn);
-        row.amount = row.qty_ordered * row.rate;
-        frm.refresh_field('mrn_item');
+        calculate_amount(frm, cdt, cdn);
     }
-})
+});
 
+function calculate_amount(frm, cdt, cdn) {
+    const row = frappe.get_doc(cdt, cdn);
+
+    const qty = flt(row.qty_ordered);
+    const rate = flt(row.rate);
+
+    // Only calculate if both have valid data
+    if (qty > 0 && rate > 0) {
+        row.amount = qty * rate;
+    } else {
+        // optional: reset amount if one value is missing
+        row.amount = 0;
+    }
+
+    frm.refresh_field('mrn_item');
+}
 
 function show_po_dialog(frm, warehouse) {
     const d = new frappe.ui.Dialog({

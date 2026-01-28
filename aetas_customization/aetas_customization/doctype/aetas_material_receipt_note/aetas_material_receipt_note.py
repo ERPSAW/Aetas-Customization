@@ -6,7 +6,11 @@ from frappe.model.document import Document
 import json
 
 class AETASMaterialReceiptNote(Document):
-    pass
+    def validate(self):
+        if self.mrn_item and len(self.mrn_item) > 0:
+            self.total_amount = sum(item.amount for item in self.mrn_item)
+        else:
+            self.total_amount = 0
 
 
 @frappe.whitelist()
