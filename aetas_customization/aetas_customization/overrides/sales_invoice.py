@@ -80,6 +80,17 @@ def on_submit(self, method):
             {"custom_si_ref": self.name, "status": "Converted"},
             update_modified=False,
         )
+    
+    customer_doc = frappe.get_doc("Customer", self.customer)
+    customer_doc.append(
+        "custom_customer_journey",
+        {
+            "journey_date": frappe.utils.now_datetime(),
+            "journey_type": "Purchase",
+            "sales_person":customer_doc.get("custom_sales_person"),
+            "description": f"Purchase recorded on {self.posting_date} via Sales Invoice {self.name}.",
+        },
+    )
 
     customer = frappe.db.get_value(
         "Customer", self.customer, "custom_customer_without_sales"

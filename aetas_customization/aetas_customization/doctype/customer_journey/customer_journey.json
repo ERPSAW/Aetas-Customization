@@ -1,0 +1,70 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-01-29 11:11:57.472358",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "journey_date",
+  "sales_person",
+  "journey_type",
+  "description",
+  "boutique",
+  "loss_of_sale_watch_reference"
+ ],
+ "fields": [
+  {
+   "fieldname": "journey_date",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Journey Date"
+  },
+  {
+   "fieldname": "sales_person",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Sales Person",
+   "options": "Sales Person"
+  },
+  {
+   "fieldname": "journey_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Journey Type",
+   "options": "\nCreation\nPurchase\nClient Visit"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Description"
+  },
+  {
+   "fieldname": "boutique",
+   "fieldtype": "Link",
+   "label": "Boutique",
+   "options": "Boutique"
+  },
+  {
+   "fieldname": "loss_of_sale_watch_reference",
+   "fieldtype": "Small Text",
+   "label": "Loss of Sale Watch Reference"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-01-29 11:20:33.170453",
+ "modified_by": "Administrator",
+ "module": "Aetas Customization",
+ "name": "Customer Journey",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
