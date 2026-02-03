@@ -42,6 +42,8 @@ fixtures = [
                     "Lead-custom_contact",
                     "Customer-custom_customer_without_sales",
                     "Lead-custom_unqualified_reason",
+                    "Customer-custom_journey",
+                    "Customer-custom_customer_journey"
                 ],
             ]
         ],
@@ -206,7 +208,17 @@ doc_events = {
         "on_update": "aetas_customization.overrides.lead.on_update",
         "validate": "aetas_customization.overrides.lead.validate",
     },
+    "Customer": {
+        "after_insert": "aetas_customization.aetas_customization.overrides.customer.after_insert",
+    },
 }
+
+
+# hooks.py
+
+after_migrate = [
+    "aetas_customization.aetas_customization.overrides.utils.update_customer_journeys"
+]
 
 # Scheduled Tasks
 # ---------------
