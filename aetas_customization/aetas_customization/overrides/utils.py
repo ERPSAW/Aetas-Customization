@@ -8,7 +8,7 @@ def get_customers_batch(offset=0, limit=100):
     """Fetch customers in batches."""
     return frappe.get_all(
         "Customer",
-        filters={"custom_sales_person": ["is", "set"], "custom_source": ["is", "set"]},
+        filters={"custom_sales_person": ["is", "set"]},
         fields=["name", "creation", "custom_sales_person", "custom_source"],
         start=offset,
         page_length=limit,
@@ -19,7 +19,7 @@ def get_total_customers_count():
     """Get total count of customers matching criteria."""
     return frappe.db.count(
         "Customer",
-        filters={"custom_sales_person": ["is", "set"], "custom_source": ["is", "set"]},
+        filters={"custom_sales_person": ["is", "set"]},
     )
 
 
@@ -61,6 +61,10 @@ def set_customer_creation_journey_batch(customers):
             continue
 
         try:
+            if customer.custom_source:
+                description = f"This customer was created on {getdate(customer.creation)} by Sales Person {customer.custom_sales_person} via {customer.custom_source} lead source."
+            else:
+                description = f"This customer was created on {getdate(customer.creation)} by Sales Person {customer.custom_sales_person}."
             # Use SQL for direct insertion - much faster than ORM
             frappe.db.sql(
                 """
@@ -89,7 +93,7 @@ def set_customer_creation_journey_batch(customers):
                     "customer": customer.name,
                     "journey_date": customer.creation,
                     "sales_person": customer.custom_sales_person,
-                    "description": f"This customer was created on {getdate(customer.creation)} by Sales Person {customer.custom_sales_person} via {customer.custom_source} lead source.",
+                    "description": description,
                     "now": now_datetime(),
                     "user": frappe.session.user,
                 },
