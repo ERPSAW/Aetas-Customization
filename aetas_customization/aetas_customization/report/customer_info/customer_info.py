@@ -26,6 +26,12 @@ def get_columns():
 			"width":250,
 		},
 		{
+			"fieldname":"customer_creation",
+			"label":"Customer Creation Datetime",
+			"fieldtype":"Data",
+			"width":250,
+		},
+		{
 			"fieldname": "sales_person",
 			"label": "SA Name",
 			"fieldtype": "Link",
@@ -73,6 +79,7 @@ def get_data(filters):
 		SELECT 
 			c.name as customer,
 			c.customer_name as customer_name,
+			DATE_FORMAT(c.creation, '%%b %%d %%Y %%h:%%i%%p') AS customer_creation,
 			c.custom_sales_person as sales_person,
 			IF(c.custom_contact IS NOT NULL AND c.custom_contact != '', 'Yes', 'No') as mobile,
 			IF(c.custom_email IS NOT NULL AND c.custom_email != '', 'Yes', 'No') as email,
