@@ -216,9 +216,9 @@ doc_events = {
 
 # hooks.py
 
-after_migrate = [
-    "aetas_customization.aetas_customization.overrides.utils.update_customer_journeys"
-]
+# after_migrate = [
+#     "aetas_customization.aetas_customization.overrides.utils.update_customer_journeys"
+# ]
 
 # Scheduled Tasks
 # ---------------
