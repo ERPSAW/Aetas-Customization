@@ -1,0 +1,335 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "BDE-{boutique}-{date}",
+ "creation": "2026-03-18 16:46:53.276749",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "boutique",
+  "date",
+  "status",
+  "col_break_1",
+  "day_started_at",
+  "day_started_by",
+  "day_ended_at",
+  "day_ended_by",
+  "sec_day_start",
+  "day_start_petty_cash",
+  "day_start_remarks",
+  "sec_walk_in",
+  "walk_in",
+  "walk_in_remarks",
+  "col_break_new_cust",
+  "new_customers",
+  "new_customers_remarks",
+  "sec_existing_cust",
+  "existing_customers",
+  "existing_customers_remarks",
+  "col_break_inv",
+  "total_invoices",
+  "total_invoices_remarks",
+  "total_invoices_from_system",
+  "sec_payments_cc_bank",
+  "cc",
+  "cc_remarks",
+  "cc_attachments",
+  "col_break_bank",
+  "bank_transfer",
+  "bank_transfer_remarks",
+  "bank_transfer_attachments",
+  "sec_payments_cash_other",
+  "cash",
+  "cash_remarks",
+  "cash_attachments",
+  "col_break_other",
+  "other",
+  "other_remarks",
+  "other_attachments",
+  "sec_day_end_petty",
+  "day_end_petty_cash"
+ ],
+ "fields": [
+  {
+   "fieldname": "boutique",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Boutique",
+   "options": "Boutique",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "default": "Today",
+   "fieldname": "date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Date",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "bold": 1,
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_filter": 1,
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Draft\nDay Started\nDay Ended"
+  },
+  {
+   "fieldname": "col_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "day_started_at",
+   "fieldtype": "Datetime",
+   "label": "Started At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "day_started_by",
+   "fieldtype": "Link",
+   "label": "Started By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "day_ended_at",
+   "fieldtype": "Datetime",
+   "label": "Ended At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "day_ended_by",
+   "fieldtype": "Link",
+   "label": "Ended By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_day_start",
+   "fieldtype": "Section Break",
+   "label": "Day Start"
+  },
+  {
+   "default": "0",
+   "fieldname": "day_start_petty_cash",
+   "fieldtype": "Currency",
+   "label": "Opening Petty Cash"
+  },
+  {
+   "fieldname": "day_start_remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "sec_walk_in",
+   "fieldtype": "Section Break",
+   "label": "Day End \u2014 Walk In & New Customers"
+  },
+  {
+   "default": "0",
+   "fieldname": "walk_in",
+   "fieldtype": "Int",
+   "label": "Walk In"
+  },
+  {
+   "fieldname": "walk_in_remarks",
+   "fieldtype": "Small Text",
+   "label": "Walk In Remarks"
+  },
+  {
+   "fieldname": "col_break_new_cust",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "new_customers",
+   "fieldtype": "Int",
+   "label": "New Customers"
+  },
+  {
+   "fieldname": "new_customers_remarks",
+   "fieldtype": "Small Text",
+   "label": "New Customers Remarks"
+  },
+  {
+   "fieldname": "sec_existing_cust",
+   "fieldtype": "Section Break",
+   "label": "Day End \u2014 Existing Customers & Invoices"
+  },
+  {
+   "default": "0",
+   "fieldname": "existing_customers",
+   "fieldtype": "Int",
+   "label": "Existing Customers"
+  },
+  {
+   "fieldname": "existing_customers_remarks",
+   "fieldtype": "Small Text",
+   "label": "Existing Customers Remarks"
+  },
+  {
+   "fieldname": "col_break_inv",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "total_invoices",
+   "fieldtype": "Int",
+   "label": "Total Invoices (Manual)"
+  },
+  {
+   "fieldname": "total_invoices_remarks",
+   "fieldtype": "Small Text",
+   "label": "Total Invoices Remarks"
+  },
+  {
+   "default": "0",
+   "fieldname": "total_invoices_from_system",
+   "fieldtype": "Int",
+   "label": "Total Invoices (System Auto)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sec_payments_cc_bank",
+   "fieldtype": "Section Break",
+   "label": "Day End \u2014 Credit Card & Bank Transfer"
+  },
+  {
+   "default": "0",
+   "fieldname": "cc",
+   "fieldtype": "Currency",
+   "label": "Credit Card"
+  },
+  {
+   "fieldname": "cc_remarks",
+   "fieldtype": "Small Text",
+   "label": "Credit Card Remarks"
+  },
+  {
+   "fieldname": "cc_attachments",
+   "fieldtype": "Table MultiSelect",
+   "label": "Credit Card Attachments",
+   "options": "Boutique Day Attachments"
+  },
+  {
+   "fieldname": "col_break_bank",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "bank_transfer",
+   "fieldtype": "Currency",
+   "label": "Bank Transfer"
+  },
+  {
+   "fieldname": "bank_transfer_remarks",
+   "fieldtype": "Small Text",
+   "label": "Bank Transfer Remarks"
+  },
+  {
+   "fieldname": "bank_transfer_attachments",
+   "fieldtype": "Table MultiSelect",
+   "label": "Bank Transfer Attachments",
+   "options": "Boutique Day Attachments"
+  },
+  {
+   "fieldname": "sec_payments_cash_other",
+   "fieldtype": "Section Break",
+   "label": "Day End \u2014 Cash & Other Payments"
+  },
+  {
+   "default": "0",
+   "fieldname": "cash",
+   "fieldtype": "Currency",
+   "label": "Cash"
+  },
+  {
+   "fieldname": "cash_remarks",
+   "fieldtype": "Small Text",
+   "label": "Cash Remarks"
+  },
+  {
+   "fieldname": "cash_attachments",
+   "fieldtype": "Table MultiSelect",
+   "label": "Cash Attachments",
+   "options": "Boutique Day Attachments"
+  },
+  {
+   "fieldname": "col_break_other",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "other",
+   "fieldtype": "Currency",
+   "label": "Other"
+  },
+  {
+   "fieldname": "other_remarks",
+   "fieldtype": "Small Text",
+   "label": "Other Remarks"
+  },
+  {
+   "fieldname": "other_attachments",
+   "fieldtype": "Table MultiSelect",
+   "label": "Other Attachments",
+   "options": "Boutique Day Attachments"
+  },
+  {
+   "fieldname": "sec_day_end_petty",
+   "fieldtype": "Section Break",
+   "label": "Day End \u2014 Closing"
+  },
+  {
+   "default": "0",
+   "description": "Auto-carried to next day's opening petty cash",
+   "fieldname": "day_end_petty_cash",
+   "fieldtype": "Currency",
+   "label": "Closing Petty Cash"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-03-20 13:45:58.295850",
+ "modified_by": "Administrator",
+ "module": "Aetas Customization",
+ "name": "Boutique Day Entry",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Boutique Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "date",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "boutique"
+}

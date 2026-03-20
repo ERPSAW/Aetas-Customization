@@ -4,6 +4,18 @@ from frappe import _
 
 
 def validate(self, method):
+    started = frappe.db.exists(
+        "Boutique Day Entry",
+        {"date": today(), "status": ["in", ["Day Started", "Day Ended"]]},
+    )
+    if not started:
+        frappe.throw(
+            msg=(
+                "You cannot create a Sales Invoice — no Boutique Day has been started for today.<br>"
+                "Please go to <b>Boutique Day Entry</b> and start the day first."
+            ),
+            title="Day Not Started",
+        )
     if self.cost_center:
         letter_head = frappe.db.get_value(
             "Cost Center", self.cost_center, "custom_letter_head"
