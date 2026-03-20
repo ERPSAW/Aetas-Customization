@@ -42,8 +42,8 @@
           </div>
           <div class="bd-empty-title">Access Denied</div>
           <div class="bd-empty-sub">
-            Your user profile lacks a linked Boutique.<br>
-            <i>(Requires: Boutique Manager Role &rarr; Linked Employee &rarr; Sales Person &rarr; Custom Boutique)</i>
+            Your user profile is not configured as a manager for any Boutique.<br>
+            <i>(Requires: Boutique Manager Role &rarr; Linked in Boutique's "Boutique Manager" field)</i>
           </div>
         </div>
 
@@ -156,7 +156,7 @@
                     <span class="bd-inner-title" style="font-size: 1.1rem;">Day End</span>
                   </div>
 
-                  <div class="bd-fg-title">Customer Count</div>
+                  <div class="bd-fg-title">Customer Count & Invoices</div>
                   <div class="bd-grid bd-g2">
                     <div v-for="f in countFields" :key="f.key" class="bd-metric-block">
                       <div class="bd-metric-top">
@@ -165,17 +165,6 @@
                       </div>
                       <div class="bd-metric-tools">
                         <input type="text" class="bd-input bd-input-sm" placeholder="Remarks..." v-model="eF[f.key + '_remarks']" />
-                        <div class="bd-upload-wrap">
-                          <label class="bd-upload-btn">
-                            Attach Files
-                            <input type="file" multiple @change="uploadFile($event, f.key)" hidden />
-                          </label>
-                          <div class="bd-chips">
-                            <span class="bd-chip-file" v-for="(fileId, i) in eF[f.key + '_attachments']" :key="i">
-                              {{ fileId }} <span @click="removeFile(f.key, i)">&times;</span>
-                            </span>
-                          </div>
-                        </div>
                       </div>
                     </div>
                   </div>
@@ -251,15 +240,12 @@
               <div v-if="isHistOpen(h.date)" class="bd-hist-body" @click.stop>
                 <div class="bd-hist-grid">
                   <div>
-                    <div class="bd-hist-sec-title">Customer Count</div>
+                    <div class="bd-hist-sec-title">Customer Count & Invoices</div>
                     <div class="bd-ro">
                       <div class="bd-ro-item" v-for="f in countFields" :key="f.key">
                         <div class="bd-ro-lbl">{{ f.label }}</div>
                         <div class="bd-ro-val">{{ h[f.key] || 0 }}</div>
                         <div class="bd-hist-rm" v-if="h[f.key + '_remarks']">{{ h[f.key + '_remarks'] }}</div>
-                        <div class="bd-chips" v-if="h[f.key + '_attachments'] && h[f.key + '_attachments'].length">
-                          <span class="bd-chip-file ro" v-for="id in h[f.key + '_attachments']" :key="id">{{ id }}</span>
-                        </div>
                       </div>
                     </div>
                   </div>
@@ -326,7 +312,15 @@ const sF = reactive({ petty_cash: 0, remarks: '' });
 
 // Dynamically initialize the End Form (eF) based on smart fields
 const eF = reactive({ day_end_petty_cash: 0 });
-[...countFields, ...paymentFields].forEach(f => {
+
+// Counts: No attachments
+countFields.forEach(f => {
+  eF[f.key] = 0;
+  eF[f.key + '_remarks'] = '';
+});
+
+// Payments: Includes attachments
+paymentFields.forEach(f => {
   eF[f.key] = 0;
   eF[f.key + '_remarks'] = '';
   eF[f.key + '_attachments'] = [];

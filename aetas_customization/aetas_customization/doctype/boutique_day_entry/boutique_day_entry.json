@@ -20,19 +20,15 @@
   "sec_walk_in",
   "walk_in",
   "walk_in_remarks",
-  "walk_in_attachments",
   "col_break_new_cust",
   "new_customers",
   "new_customers_remarks",
-  "new_customers_attachments",
   "sec_existing_cust",
   "existing_customers",
   "existing_customers_remarks",
-  "existing_customers_attachments",
   "col_break_inv",
   "total_invoices",
   "total_invoices_remarks",
-  "total_invoices_attachments",
   "total_invoices_from_system",
   "sec_payments_cc_bank",
   "cc",
@@ -80,8 +76,7 @@
    "in_filter": 1,
    "in_list_view": 1,
    "label": "Status",
-   "options": "Draft\nDay Started\nDay Ended",
-   "read_only": 1
+   "options": "Draft\nDay Started\nDay Ended"
   },
   {
    "fieldname": "col_break_1",
@@ -146,12 +141,6 @@
    "label": "Walk In Remarks"
   },
   {
-   "fieldname": "walk_in_attachments",
-   "fieldtype": "Table MultiSelect",
-   "label": "Walk In Attachments",
-   "options": "Boutique Day Attachments"
-  },
-  {
    "fieldname": "col_break_new_cust",
    "fieldtype": "Column Break"
   },
@@ -165,12 +154,6 @@
    "fieldname": "new_customers_remarks",
    "fieldtype": "Small Text",
    "label": "New Customers Remarks"
-  },
-  {
-   "fieldname": "new_customers_attachments",
-   "fieldtype": "Table MultiSelect",
-   "label": "New Customers Attachments",
-   "options": "Boutique Day Attachments"
   },
   {
    "fieldname": "sec_existing_cust",
@@ -189,12 +172,6 @@
    "label": "Existing Customers Remarks"
   },
   {
-   "fieldname": "existing_customers_attachments",
-   "fieldtype": "Table MultiSelect",
-   "label": "Existing Customers Attachments",
-   "options": "Boutique Day Attachments"
-  },
-  {
    "fieldname": "col_break_inv",
    "fieldtype": "Column Break"
   },
@@ -208,12 +185,6 @@
    "fieldname": "total_invoices_remarks",
    "fieldtype": "Small Text",
    "label": "Total Invoices Remarks"
-  },
-  {
-   "fieldname": "total_invoices_attachments",
-   "fieldtype": "Table MultiSelect",
-   "label": "Total Invoices Attachments",
-   "options": "Boutique Day Attachments"
   },
   {
    "default": "0",
@@ -324,7 +295,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-19 13:03:35.015077",
+ "modified": "2026-03-20 13:45:58.295850",
  "modified_by": "Administrator",
  "module": "Aetas Customization",
  "name": "Boutique Day Entry",

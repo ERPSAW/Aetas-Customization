@@ -36,8 +36,8 @@ class BoutiqueDayEntry(Document):
 @frappe.whitelist()
 def get_current_user_boutique() -> str | None:
     """
-    Traverse the User -> Employee -> Sales Person hierarchy to find the assigned boutique.
-    Returns None if the user is unauthorized or missing links.
+    Check if the user has the role and is directly linked as the 'boutique_manager'
+    on a Boutique record.
     """
     user = frappe.session.user
 
@@ -45,16 +45,11 @@ def get_current_user_boutique() -> str | None:
     if "Boutique Manager" not in frappe.get_roles(user):
         return None
 
-    # 2. Must be linked to an Employee record
-    employee = frappe.db.get_value("Employee", {"user_id": user}, "name")
-    if not employee:
-        return None
-
-    # 3. Employee must be linked to a Sales Person, extract custom_botique
+    # 2. Check Boutique DocType directly
     boutique = frappe.db.get_value(
-        "Sales Person", 
-        {"employee": employee}, 
-        "custom_botique"
+        "Boutique", 
+        {"boutique_manager": user}, 
+        "name"
     )
 
     return boutique
@@ -70,19 +65,17 @@ def get_entries_for_page(boutique: str, limit: int | str = 10) -> list[dict[str,
         limit=int(limit),
     )
 
-    metrics = [
-        "walk_in", "new_customers", "existing_customers", "total_invoices",
-        "cc", "bank_transfer", "cash", "other"
-    ]
+    payment_metrics = ["cc", "bank_transfer", "cash", "other"]
 
     for entry in entries:
         if entry.status == "Day Ended":
             doc = frappe.get_doc("Boutique Day Entry", entry.name)
-            for m in metrics:
+            for m in payment_metrics:
                 table_field = f"{m}_attachments"
-                entry[table_field] = [row.file for row in doc.get(table_field)]
+                if doc.meta.has_field(table_field):
+                    entry[table_field] = [row.file for row in doc.get(table_field)]
         else:
-            for m in metrics:
+            for m in payment_metrics:
                 entry[f"{m}_attachments"] = []
 
     return entries
@@ -117,6 +110,7 @@ def get_day_status(boutique):
         "today_entry": today_entry,
         "pending_previous": pending_previous,
     }
+
 
 @frappe.whitelist()
 def start_day(boutique: str, petty_cash: float | str = 0, remarks: str = "") -> dict[str, Any]:
@@ -171,21 +165,22 @@ def end_day(entry_name: str, payload: str) -> dict[str, Any]:
         {"posting_date": doc.date, "docstatus": 1},
     )
 
-    metrics = [
-        "walk_in", "new_customers", "existing_customers", "total_invoices",
-        "cc", "bank_transfer", "cash", "other"
-    ]
+    count_metrics = ["walk_in", "new_customers", "existing_customers", "total_invoices"]
+    payment_metrics = ["cc", "bank_transfer", "cash", "other"]
 
-    for metric in metrics:
+    # Process all values and remarks
+    for metric in count_metrics + payment_metrics:
         doc.set(metric, data.get(metric, 0))
         doc.set(f"{metric}_remarks", data.get(f"{metric}_remarks", ""))
         
+    # Process attachments ONLY for payments
+    for metric in payment_metrics:
         table_field = f"{metric}_attachments"
-        doc.set(table_field, []) 
-        
-        for file_id in data.get(table_field, []):
-            if file_id:
-                doc.append(table_field, {"file": file_id})
+        if doc.meta.has_field(table_field):
+            doc.set(table_field, []) 
+            for file_id in data.get(table_field, []):
+                if file_id:
+                    doc.append(table_field, {"file": file_id})
 
     doc.total_invoices_from_system = system_count
     doc.day_end_petty_cash = float(data.get("day_end_petty_cash", 0))
@@ -217,7 +212,7 @@ def get_previous_petty_cash(boutique: str) -> dict[str, Any]:
 
 
 def validate_sales_invoice(doc: Document, method: str) -> None:
-    if "Boutique Manager" not in frappe.get_roles(user):
+    if "Boutique Manager" not in frappe.get_roles(frappe.session.user):
         return
 
     started = frappe.db.exists(

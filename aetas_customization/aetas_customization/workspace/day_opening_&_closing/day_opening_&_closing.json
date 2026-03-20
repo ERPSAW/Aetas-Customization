@@ -1,7 +1,7 @@
 {
  "charts": [],
- "content": "[{\"id\":\"4uxAWINcUr\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Boutique Manager</span>\",\"col\":12}},{\"id\":\"CRkv0r_-JC\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"Boutique Day Status\",\"col\":12}}]",
- "creation": "2026-03-19 12:13:59.756865",
+ "content": "[{\"id\":\"7OvVzSaRLb\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Day Opening &amp; Closing</span>\",\"col\":12}},{\"id\":\"VBtAydplXr\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"Boutique Day Status\",\"col\":12}}]",
+ "creation": "2026-03-20 13:30:11.377028",
  "custom_blocks": [
   {
    "custom_block_name": "Boutique Day Status",
@@ -15,23 +15,19 @@
  "idx": 0,
  "indicator_color": "green",
  "is_hidden": 0,
- "label": "Boutique Manager",
+ "label": "Day Opening & Closing",
  "links": [],
- "modified": "2026-03-19 12:43:57.307504",
+ "modified": "2026-03-20 13:31:22.632850",
  "modified_by": "Administrator",
  "module": "Aetas Customization",
- "name": "Boutique Manager",
+ "name": "Day Opening & Closing",
  "number_cards": [],
  "owner": "Administrator",
  "parent_page": "",
  "public": 1,
  "quick_lists": [],
- "roles": [
-  {
-   "role": "Boutique Manager"
-  }
- ],
+ "roles": [],
  "sequence_id": 28.0,
  "shortcuts": [],
- "title": "Boutique Manager"
+ "title": "Day Opening & Closing"
 }

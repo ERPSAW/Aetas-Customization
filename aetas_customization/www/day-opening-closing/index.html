@@ -1,0 +1,444 @@
+{% extends "templates/web.html" %}
+
+{% block title %}Boutique Day Management – User Guide{% endblock %}
+
+{% block page_content %}
+<link rel="stylesheet" href="/assets/aetas_customization/css/day_opening_closing.css">
+
+<article class="doc-wrap">
+    <header class="doc-header">
+        <h1 class="doc-title">Boutique Day Management — User Guide</h1>
+        <p class="doc-lead">
+            Complete step-by-step guide for Boutique Managers on how to open the register, log daily collections, end
+            shifts, and view historical data.
+        </p>
+        <div class="doc-meta">
+            <span class="doc-badge">Boutique Operations</span>
+            <span class="doc-badge">Daily Settlement</span>
+            <span class="doc-badge doc-badge--info">Updated: {{ frappe.utils.formatdate(frappe.utils.nowdate())
+                }}</span>
+        </div>
+    </header>
+
+    <div class="doc-page" style="margin-top:1.25rem;">
+        <nav class="doc-sidebar" aria-label="Documentation menu">
+            <div class="sidebar-title">
+                <strong>Contents</strong>
+                <span style="margin-left:auto" class="sidebar-badge">5 topics</span>
+            </div>
+
+            <button class="sidebar-toggle" aria-expanded="false" onclick="toggleAllSidebar()">Toggle topics</button>
+
+            <ul class="sidebar-list">
+                <li class="sidebar-topic">
+                    <button type="button" aria-controls="sub-1" aria-expanded="false" onclick="toggleTopic(this)">
+                        1. Getting Started & Dashboard
+                        <span class="chev open">▶</span>
+                    </button>
+                    <ul id="sub-1" class="subtopic-list" style="display:block;">
+                        <li><a href="#t-1-1">1.1 Reading the Status Dashboard</a></li>
+                    </ul>
+                </li>
+
+                <li class="sidebar-topic">
+                    <button type="button" aria-controls="sub-2" aria-expanded="false" onclick="toggleTopic(this)">
+                        2. Starting Your Day
+                        <span class="chev">▶</span>
+                    </button>
+                    <ul id="sub-2" class="subtopic-list">
+                        <li><a href="#t-2-1">2.1 Opening the Register</a></li>
+                    </ul>
+                </li>
+
+                <li class="sidebar-topic">
+                    <button type="button" aria-controls="sub-3" aria-expanded="false" onclick="toggleTopic(this)">
+                        3. Ending Your Day
+                        <span class="chev">▶</span>
+                    </button>
+                    <ul id="sub-3" class="subtopic-list">
+                        <li><a href="#t-3-1">3.1 Closing the Register & Collections</a></li>
+                    </ul>
+                </li>
+
+                <li class="sidebar-topic">
+                    <button type="button" aria-controls="sub-4" aria-expanded="false" onclick="toggleTopic(this)">
+                        4. Handling Missed Entries
+                        <span class="chev">▶</span>
+                    </button>
+                    <ul id="sub-4" class="subtopic-list">
+                        <li><a href="#t-4-1">4.1 Resolving Previous Days</a></li>
+                    </ul>
+                </li>
+
+                <li class="sidebar-topic">
+                    <button type="button" aria-controls="sub-5" aria-expanded="false" onclick="toggleTopic(this)">
+                        5. Viewing History
+                        <span class="chev">▶</span>
+                    </button>
+                    <ul id="sub-5" class="subtopic-list">
+                        <li><a href="#t-5-1">5.1 Past Entries & Summaries</a></li>
+                    </ul>
+                </li>
+            </ul>
+        </nav>
+
+        <main class="doc-content">
+            <section class="doc-section">
+                <h2 class="doc-section-title">Overview</h2>
+                <p class="doc-lead">
+                    This guide will walk you through the daily routine of managing your boutique's register. It is
+                    required to start your day here before generating any sales invoices, and to end your day here to
+                    reconcile your collections.
+                </p>
+            </section>
+
+            <section class="doc-section">
+                <h2 class="doc-section-title">Section 1 — Getting Started & Dashboard Overview</h2>
+            </section>
+
+            <section id="t-1-1" class="doc-section subtopic-card">
+                <div class="card-header">
+                    <h3 class="card-title">1.1 Reading the Status Dashboard</h3>
+                    <span class="chip">Daily Check</span>
+                </div>
+
+                <div class="doc-grid">
+                    <div class="doc-col doc-col--text">
+                        <h4 class="doc-subtitle">Objective</h4>
+                        <p>
+                            Learn how to access your workspace and instantly know the status of your boutique's register
+                            based on the Smart Status Card.
+                        </p>
+
+                        <h4 class="doc-subtitle">Understanding the Colors</h4>
+                        <div class="doc-note">
+                            <strong>🟠 Orange (Pending Start):</strong> Your shift hasn't been started today. You need
+                            to open the register.<br><br>
+                            <strong>🟢 Green (Active Shift):</strong> Your register is open and running. You are ready
+                            to process sales.<br><br>
+                            <strong>🔴 Red (Action Required):</strong> You forgot to close a previous shift. You are
+                            locked out of today until you close the missed day.<br><br>
+                            <strong>🟣 Purple (Completed):</strong> You have successfully ended today's shift and
+                            reconciled all cash.
+                        </div>
+
+                        <h4 class="doc-subtitle">Access Denied?</h4>
+                        <p>
+                            If you see a grey "Access Denied / No Boutique Assigned" screen with a lock icon, it means
+                            your user profile hasn't been linked to a specific store yet. Please contact your system
+                            administrator to assign you to your boutique.
+                        </p>
+                    </div>
+
+                    <div class="doc-col doc-col--media">
+                        <figure class="doc-figure" style="margin-bottom: 1.5rem; text-align: center;">
+                            {% set img_1 = frappe.db.get_value("File", {"file_name": "status_1.png"}, "file_url") or
+                            "/files/status_1.png" %}
+                            <img class="doc-image" src="{{ img_1 }}" alt="Dashboard Status 1"
+                                style="max-width: 75%; margin: 0 auto; display: block;">
+                            <figcaption class="doc-caption">Dashboard Status — Access Restricted</figcaption>
+                        </figure>
+
+                        <figure class="doc-figure" style="margin-bottom: 1.5rem; text-align: center;">
+                            {% set img_2 = frappe.db.get_value("File", {"file_name": "status_2.png"}, "file_url") or
+                            "/files/status_2.png" %}
+                            <img class="doc-image" src="{{ img_2 }}" alt="Dashboard Status 2"
+                                style="max-width: 75%; margin: 0 auto; display: block;">
+                            <figcaption class="doc-caption">Dashboard Status — Pending Start (Orange)</figcaption>
+                        </figure>
+
+                        <figure class="doc-figure" style="margin-bottom: 1.5rem; text-align: center;">
+                            {% set img_3 = frappe.db.get_value("File", {"file_name": "status_3.png"}, "file_url") or
+                            "/files/status_3.png" %}
+                            <img class="doc-image" src="{{ img_3 }}" alt="Dashboard Status 3"
+                                style="max-width: 75%; margin: 0 auto; display: block;">
+                            <figcaption class="doc-caption">Dashboard Status — Active Shift (Green)</figcaption>
+                        </figure>
+
+                        <figure class="doc-figure" style="margin-bottom: 1.5rem; text-align: center;">
+                            {% set img_4 = frappe.db.get_value("File", {"file_name": "status_4.png"}, "file_url") or
+                            "/files/status_4.png" %}
+                            <img class="doc-image" src="{{ img_4 }}" alt="Dashboard Status 4"
+                                style="max-width: 75%; margin: 0 auto; display: block;">
+                            <figcaption class="doc-caption">Dashboard Status — Action Required (Red)</figcaption>
+                        </figure>
+
+                        <figure class="doc-figure" style="text-align: center;">
+                            {% set img_5 = frappe.db.get_value("File", {"file_name": "status_5.png"}, "file_url") or
+                            "/files/status_5.png" %}
+                            <img class="doc-image" src="{{ img_5 }}" alt="Dashboard Status 5"
+                                style="max-width: 75%; margin: 0 auto; display: block;">
+                            <figcaption class="doc-caption">Dashboard Status — Completed (Purple)</figcaption>
+                        </figure>
+                    </div>
+                </div>
+            </section>
+
+            <section class="doc-section">
+                <h2 class="doc-section-title">Section 2 — Starting Your Day</h2>
+            </section>
+
+            <section id="t-2-1" class="doc-section subtopic-card">
+                <div class="card-header">
+                    <h3 class="card-title">2.1 Opening the Register</h3>
+                    <span class="chip chip--ok">Morning Task</span>
+                </div>
+
+                <div class="doc-grid">
+                    <div class="doc-col doc-col--text">
+                        <h4 class="doc-subtitle">Objective</h4>
+                        <p>
+                            Officially open your register for the day. <strong>Note:</strong> You cannot create any
+                            Sales Invoices until this step is completed.
+                        </p>
+
+                        <h4 class="doc-subtitle">Steps to Start</h4>
+                        <ol class="doc-steps">
+                            <li>Click the button on your Orange dashboard card to go to the Day Entry page.</li>
+                            <li>Review the <strong>Opening Petty Cash</strong>. The system automatically fills this with
+                                whatever cash you left in the drawer yesterday.</li>
+                            <li>If the actual cash in the drawer is different, adjust the number manually.</li>
+                            <li>Add any <strong>Remarks</strong> (optional morning notes).</li>
+                            <li>Click the <strong>Start Day &rarr;</strong> button.</li>
+                        </ol>
+
+                        <h4 class="doc-subtitle">Expected Result</h4>
+                        <p>
+                            A green success message will appear. The screen will update to show your "Day End" form, and
+                            your workspace dashboard will turn Green (Active). You can now process sales normally.
+                        </p>
+
+                        <div class="doc-downloads">
+                            {% set video_2 = frappe.db.get_value("File", {"file_name": "start_day.mp4"}, "file_url") or
+                            "/files/start_day.mp4" %}
+                            <a class="doc-link" href="{{ video_2 }}" download>Download Video (MP4)</a>
+                        </div>
+                    </div>
+
+                    <div class="doc-col doc-col--media">
+                        <figure class="doc-figure">
+                            <video class="doc-video" controls preload="metadata" playsinline>
+                                <source src="{{ video_2 }}" type="video/mp4">
+                                Your browser does not support HTML5 video.
+                            </video>
+                            <figcaption class="doc-caption">Video — Entering Opening Cash and Starting the Day
+                            </figcaption>
+                        </figure>
+                    </div>
+                </div>
+            </section>
+
+            <section class="doc-section">
+                <h2 class="doc-section-title">Section 3 — Ending Your Day</h2>
+            </section>
+
+            <section id="t-3-1" class="doc-section subtopic-card">
+                <div class="card-header">
+                    <h3 class="card-title">3.1 Closing the Register & Collections</h3>
+                    <span class="chip chip--ok">Evening Task</span>
+                </div>
+
+                <div class="doc-grid">
+                    <div class="doc-col doc-col--text">
+                        <h4 class="doc-subtitle">Objective</h4>
+                        <p>
+                            Log daily footfall, enter payment collections, attach settlement proofs, and officially
+                            close the shift.
+                        </p>
+
+                        <h4 class="doc-subtitle">Steps to Close</h4>
+                        <ol class="doc-steps">
+                            <li>Navigate back to the Day Entry page at the end of your shift.</li>
+                            <li><strong>Customer Count:</strong> Enter the total number of Walk-ins, New Customers, and
+                                Existing Customers.</li>
+                            <li><strong>Invoices:</strong> Enter the total number of invoices generated. <br>
+                                <em>💡 Smart Alert: If the number you type doesn't match the actual number of invoices
+                                    in the system, it will highlight in red.</em>
+                            </li>
+                            <li><strong>Payments:</strong> Enter the total collections for Cash, Credit Card, Bank
+                                Transfer, and Other.</li>
+                            <li><strong>Attach Proof:</strong> Under the payment fields, click "Attach Files" to upload
+                                your daily EDC machine settlement receipts or bank screenshots.</li>
+                            <li><strong>Closing Petty Cash:</strong> Enter the final amount of physical cash left in the
+                                drawer. (This will be tomorrow's opening cash).</li>
+                            <li>Click <strong>End Day &rarr;</strong>.</li>
+                        </ol>
+
+                        <h4 class="doc-subtitle">Important Note</h4>
+                        <p>
+                            Once you click "End Day", the entry is locked and cannot be edited. Ensure your totals match
+                            before submitting.
+                        </p>
+
+                        <div class="doc-downloads">
+                            {% set video_3 = frappe.db.get_value("File", {"file_name": "end_day.mp4"}, "file_url") or
+                            "/files/end_day.mp4" %}
+                            <a class="doc-link" href="{{ video_3 }}" download>Download Video (MP4)</a>
+                        </div>
+                    </div>
+
+                    <div class="doc-col doc-col--media">
+                        <figure class="doc-figure">
+                            <video class="doc-video" controls preload="metadata" playsinline>
+                                <source src="{{ video_3 }}" type="video/mp4">
+                                Your browser does not support HTML5 video.
+                            </video>
+                            <figcaption class="doc-caption">Video — Entering Collections, Attaching Files, and Ending
+                                the Day</figcaption>
+                        </figure>
+                    </div>
+                </div>
+            </section>
+
+            <section class="doc-section">
+                <h2 class="doc-section-title">Section 4 — Handling Missed Entries</h2>
+            </section>
+
+            <section id="t-4-1" class="doc-section subtopic-card">
+                <div class="card-header">
+                    <h3 class="card-title">4.1 Resolving Previous Days</h3>
+                    <span class="chip chip--err">⚠️ Troubleshooting</span>
+                </div>
+
+                <div class="doc-grid">
+                    <div class="doc-col doc-col--text">
+                        <h4 class="doc-subtitle">What Happens if I Forget to Close?</h4>
+                        <p>
+                            If you forget to end your day yesterday, the system will lock your register today. Your
+                            dashboard will turn Red, and you will not be able to start a new shift.
+                        </p>
+
+                        <h4 class="doc-subtitle">How to Fix It</h4>
+                        <ol class="doc-steps">
+                            <li>Click the button on the Red dashboard card to go to the Day Entry page.</li>
+                            <li>You will see a red <strong>"Previous Day"</strong> warning at the top of the form,
+                                showing the date you missed.</li>
+                            <li>Fill out the customer counts, payments, and closing cash exactly as you would for a
+                                normal day close.</li>
+                            <li>Click <strong>End Day</strong>.</li>
+                            <li>The system will now unlock, and present you with today's "Start Day" form so you can
+                                continue working normally.</li>
+                        </ol>
+
+                        <div class="doc-downloads">
+                            {% set video_4 = frappe.db.get_value("File", {"file_name": "missed_entry.mp4"}, "file_url")
+                            or "/files/missed_entry.mp4" %}
+                            <a class="doc-link" href="{{ video_4 }}" download>Download Video (MP4)</a>
+                        </div>
+                    </div>
+
+                    <div class="doc-col doc-col--media">
+                        <figure class="doc-figure">
+                            <video class="doc-video" controls preload="metadata" playsinline>
+                                <source src="{{ video_4 }}" type="video/mp4">
+                                Your browser does not support HTML5 video.
+                            </video>
+                            <figcaption class="doc-caption">Video — Clearing a Locked Previous Day Entry</figcaption>
+                        </figure>
+                    </div>
+                </div>
+            </section>
+
+            <section class="doc-section">
+                <h2 class="doc-section-title">Section 5 — Viewing History</h2>
+            </section>
+
+            <section id="t-5-1" class="doc-section subtopic-card">
+                <div class="card-header">
+                    <h3 class="card-title">5.1 Past Entries & Summaries</h3>
+                    <span class="chip">Data Management</span>
+                </div>
+
+                <div class="doc-grid">
+                    <div class="doc-col doc-col--text">
+                        <h4 class="doc-subtitle">The "All Caught Up" Screen</h4>
+                        <p>
+                            Once you successfully close your register for the day, you will see the "All Caught Up!"
+                            screen. This provides a quick summary of your completed shift, including total hours worked,
+                            walk-ins, and collections breakdown.
+                        </p>
+
+                        <h4 class="doc-subtitle">Viewing Previous Days</h4>
+                        <ol class="doc-steps">
+                            <li>Scroll down past the main form to find the <strong>Previous Entries</strong> section.
+                            </li>
+                            <li>This list displays your last 7 closed shifts, along with their total collections and the
+                                time they were ended.</li>
+                            <li>Click on any date (or the <strong>▼</strong> arrow) to expand it.</li>
+                            <li>This will reveal the exact breakdown of Customer Counts, Payments, Remarks, and any
+                                attached files for that specific day.</li>
+                            <li>Click it again to collapse it.</li>
+                        </ol>
+
+                        <div class="doc-downloads">
+                            {% set video_5 = frappe.db.get_value("File", {"file_name": "view_history.mp4"}, "file_url")
+                            or "/files/view_history.mp4" %}
+                            <a class="doc-link" href="{{ video_5 }}" download>Download Video (MP4)</a>
+                        </div>
+                    </div>
+
+                    <div class="doc-col doc-col--media">
+                        <figure class="doc-figure">
+                            <video class="doc-video" controls preload="metadata" playsinline>
+                                <source src="{{ video_5 }}" type="video/mp4">
+                                Your browser does not support HTML5 video.
+                            </video>
+                            <figcaption class="doc-caption">Video — Viewing the Summary and Expanding History
+                            </figcaption>
+                        </figure>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+</article>
+
+<script>
+    function toggleTopic(btn) {
+        const topic = btn.parentElement;
+        const list = topic.querySelector('.subtopic-list');
+        const chev = btn.querySelector('.chev');
+        const isOpen = list.style.display === 'block';
+        if (isOpen) {
+            list.style.display = 'none';
+            chev.classList.remove('open');
+            btn.setAttribute('aria-expanded', 'false');
+        } else {
+            list.style.display = 'block';
+            chev.classList.add('open');
+            btn.setAttribute('aria-expanded', 'true');
+        }
+    }
+
+    function toggleAllSidebar() {
+        const topics = document.querySelectorAll('.sidebar-topic');
+        const anyClosed = Array.from(topics).some(t => {
+            const list = t.querySelector('.subtopic-list');
+            return getComputedStyle(list).display === 'none';
+        });
+        topics.forEach(t => {
+            const list = t.querySelector('.subtopic-list');
+            const btn = t.querySelector('button');
+            const chev = t.querySelector('.chev');
+            if (anyClosed) {
+                list.style.display = 'block';
+                chev.classList.add('open');
+                btn.setAttribute('aria-expanded', 'true');
+            } else {
+                list.style.display = 'none';
+                chev.classList.remove('open');
+                btn.setAttribute('aria-expanded', 'false');
+            }
+        });
+    }
+
+    document.querySelectorAll('.subtopic-list a').forEach(a => {
+        a.addEventListener('click', function () {
+            document.querySelectorAll('.subtopic-list a').forEach(x => x.classList.remove('active'));
+            this.classList.add('active');
+        });
+    });
+</script>
+
+{% endblock %}
