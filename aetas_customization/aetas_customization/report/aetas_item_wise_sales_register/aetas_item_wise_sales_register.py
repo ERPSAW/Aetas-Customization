@@ -176,6 +176,7 @@ def _execute(filters=None, additional_table_columns=None, additional_query_colum
 def get_purchase_rate(data):
 	if not data:
 		return data
+	
 	# ============================================================
 	# COLLECT UNIQUE ITEM CODES & CLEANED SERIAL NOS
 	# ============================================================
@@ -697,9 +698,14 @@ def get_items(filters, additional_query_columns):
 		join `tabSales Invoice Item`
 			on `tabSales Invoice`.name = `tabSales Invoice Item`.parent
 
-		-- ✅ REQUIRED JOIN (this was missing)
-		left join `tabSerial and Batch Entry` sbe
-			on sbe.parent = `tabSales Invoice Item`.serial_and_batch_bundle
+		-- ✅ Aggregate serials first
+		left join (
+			select 
+				parent,
+				GROUP_CONCAT(serial_no SEPARATOR ',') as serial_no
+			from `tabSerial and Batch Entry`
+			group by parent
+		) sbe on sbe.parent = `tabSales Invoice Item`.serial_and_batch_bundle
 
 		where `tabSales Invoice`.docstatus = 1 {1}
 		""".format(
