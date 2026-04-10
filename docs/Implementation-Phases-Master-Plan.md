@@ -21,6 +21,9 @@ This plan fully captures the text BRD requirements for:
 6. Advance adjustment prompt during invoicing.
 7. Payment link expiry, one-time reuse policy, and payment mode controls.
 8. Customer notifications.
+9. APR Payment Details child table populated per successful payment.
+10. Linking APR payment rows to Sales Invoices.
+11. Auto-populating SI Advance child table from APR payment history.
 
 ## Requirement ID Convention
 - Payments requirements: PAY-REQ-###
@@ -56,7 +59,7 @@ This plan fully captures the text BRD requirements for:
 
 ### Payment Processing and Status Updates
 10. XAPP-REQ-001: On successful Razorpay webhook, auto-create Payment Entry.
-  - Acceptance: One successful payment event produces one Payment Entry.
+  - Acceptance: One successful payment event produces one Payment Entry, and one APR Payment Detail child row is inserted on the source APR document (see AET-REQ-005).
 11. XAPP-REQ-002: Link Payment Entry to source document (APR or Sales Invoice flow context).
   - Acceptance: Backlink exists and is queryable from source document.
 12. XAPP-REQ-003: Update paid and outstanding amounts after each payment.
@@ -77,6 +80,13 @@ This plan fully captures the text BRD requirements for:
   - Acceptance: Additional links blocked only when outstanding equals zero.
 19. AET-REQ-004: Prompt user to adjust available customer advance during Sales Invoice creation.
   - Acceptance: Prompt shows available advance and options: full adjust, partial adjust, skip.
+  - Note: Two sub-flows exist — (a) prompt shown on invoice creation when advance is available; (b) auto-populate from APR payment history when opening an existing SI (covered by AET-REQ-007).
+20. AET-REQ-005: Maintain APR Payment Details child table.
+  - Acceptance: After each successful payment webhook, one child row is inserted on the source APR with Payment Entry name, amount paid, and SI field left blank. Total row count equals number of successful payments for that APR.
+21. AET-REQ-006: "Link Payment to SI" action on APR.
+  - Acceptance: User selects a payment row in the APR Payment Details child table, chooses a target Sales Invoice, and the system sets the SI field on that row and creates one corresponding entry in the SI Advance child table. Blocked with a validation error if the selected row already has an SI linked.
+22. AET-REQ-007: Auto-populate SI Advance child table when opening an existing Sales Invoice.
+  - Acceptance: When a user opens (not creates) a Sales Invoice, the system fetches all APR Payment Detail rows for the same customer where the SI field is blank and adds them to the SI Advance child table without creating duplicates.
 
 ### Partial and Multiple Payments (Core)
 20. XAPP-REQ-008: Partial payment amount must be greater than zero.
@@ -116,9 +126,9 @@ This plan fully captures the text BRD requirements for:
 1. payments owned:
   - PAY-REQ-001, PAY-REQ-002, PAY-REQ-003, PAY-REQ-004, PAY-REQ-005, PAY-REQ-006, PAY-REQ-007, PAY-REQ-008, PAY-REQ-009, PAY-REQ-010, PAY-REQ-011
 2. aetas_customization owned:
-  - AET-REQ-001, AET-REQ-002, AET-REQ-003, AET-REQ-004
+  - AET-REQ-001, AET-REQ-002, AET-REQ-003, AET-REQ-004, AET-REQ-005, AET-REQ-006, AET-REQ-007
 3. cross-app collaboration:
-  - XAPP-REQ-001 through XAPP-REQ-012
+  - XAPP-REQ-001 through XAPP-REQ-012 (XAPP-REQ-001 amended to include APR Payment Detail row insertion)
 
 ## Phased Implementation Plan
 
@@ -184,7 +194,7 @@ Implement link generation for APR and Sales Invoice with amount/mode/expiry cont
 - aetas_customization APR action to request links.
 
 #### Primary Tasks
-1. Link generation endpoints for APR and Sales Invoice.
+1. Link generation endpoints for APR and Sales Invoice. Applies whether the document is newly created or opened from the list.
 2. Enforce amount rules and allowed payment modes.
 3. Enforce configurable expiry and one-time-use semantics.
 4. Allow multiple links until outstanding equals zero.
@@ -228,11 +238,13 @@ Complete success/failure event processing with automatic accounting artifacts.
 2. Update paid/outstanding and status rules.
 3. On failure: mark Failed without financial impact.
 4. Send success/failure notifications where email exists.
+5. After creating Payment Entry, insert one APR Payment Detail child row on the source APR (Payment Entry name, amount, SI field blank).
 
 #### Exit Criteria
 1. One success event produces one Payment Entry.
 2. Failure produces no posting.
 3. Status and outstanding values match transaction ledger.
+4. APR Payment Details child table has exactly one row per successful payment; no row added on failure or duplicate webhook.
 
 #### Functional Validations
 | # | Scenario | Expected Result | Pass Condition | Test ID |
@@ -246,22 +258,31 @@ Complete success/failure event processing with automatic accounting artifacts.
 | 7 | Success webhook for customer with email| Success notification event logged | Notification record or email log entry exists | TEST-009 |
 | 8 | Failure webhook for customer with email | Failure notification event logged | Notification record or email log entry exists | TEST-009 |
 | 9 | Success webhook for customer without email | No notification error raised | Process completes without exception | TEST-009 |
+| 10 | Successful webhook: APR Payment Detail row inserted | One child row with correct PE name and amount | child_table.count == payments_count, row.payment_entry == PE.name | TEST-014 |
+| 11 | Replay duplicate successful webhook | No second child row inserted | APR Payment Details row count unchanged | TEST-014 |
+| 12 | Failure webhook received | No APR Payment Detail row inserted | child_table.count unchanged | TEST-014 |
 
 ### Phase 5: Advance Adjustment Prompt in Sales Invoice
 #### Objective
-Provide user choice for full, partial, or skipped advance adjustment during invoice flow.
+Provide user choice for full, partial, or skipped advance adjustment during invoice creation, and auto-populate SI Advance child table from APR payment history when opening an existing invoice.
 
 #### In Scope
 - aetas_customization invoice prompt behavior and adjustment actions.
+- aetas_customization Sales Invoice override: "Get Advances Received" on document open.
 
 #### Primary Tasks
+##### Sub-flow A: Advance adjustment prompt on SI creation
 1. Detect customer advance at invoice creation.
 2. Render prompt with amount and three options.
 3. Apply selected adjustment deterministically.
+##### Sub-flow B: Auto-populate SI Advance child table on opening existing SI
+4. On Sales Invoice `onload`/`refresh`, fetch all APR Payment Detail rows for the same customer where SI field is blank.
+5. Add each fetched row to the SI Advance child table, skipping rows already present (by Payment Entry reference) to prevent duplicates.
 
 #### Exit Criteria
-1. Prompt appears only when advance is available.
-2. Each option behaves as expected and is auditable.
+1. Prompt appears only when advance is available on creation.
+2. Each prompt option behaves as expected and is auditable.
+3. Opening an existing SI automatically populates the SI Advance child table from APR payment history without duplicates.
 
 #### Functional Validations
 | # | Scenario | Expected Result | Pass Condition | Test ID |
@@ -273,6 +294,38 @@ Provide user choice for full, partial, or skipped advance adjustment during invo
 | 5 | Select partial adjust with amount > advance balance | Blocked | frappe.ValidationError raised | TEST-010 |
 | 6 | Select skip | No adjustment applied, invoice unchanged | invoice.advance_adjustment == 0 | TEST-010 |
 | 7 | Verify adjustment is auditable | Adjustment reflected in invoice and linked entry | Journal or allocation entry traceable to invoice | TEST-010 |
+| 8 | Open existing SI with same-customer APR payments where SI field is blank | SI Advance child table auto-populated | Rows match APR Payment Detail entries for that customer | TEST-016 |
+| 9 | Open SI where APR row already linked to this SI | Existing row not duplicated in SI Advance child table | SI Advance row count unchanged | TEST-016 |
+| 10 | Open SI with no matching APR payment rows | SI Advance child table remains empty | No rows added, no error raised | TEST-016 |
+
+### Phase 5b: Link APR Payment to Sales Invoice
+#### Objective
+Allow users to associate an APR payment row with a Sales Invoice directly from the APR document, completing the payment-to-invoice traceability chain.
+
+#### In Scope
+- aetas_customization APR doctype: new action button and backend endpoint.
+- aetas_customization Sales Invoice override: write SI Advance child table entry.
+
+#### Primary Tasks
+1. Add "Link Payment to SI" action button on the APR Payment Details child table.
+2. On action: prompt user to select a target Sales Invoice (same customer).
+3. Validate the selected row has an amount > 0 and no SI already linked.
+4. Set the SI field on the selected APR Payment Detail row.
+5. Write one entry to the target SI Advance child table referencing this Payment Entry.
+
+#### Exit Criteria
+1. Selected APR Payment Detail row has its SI field set to the chosen invoice.
+2. Target SI Advance child table contains exactly one new entry referencing the Payment Entry.
+3. Re-linking an already-linked row is blocked with a validation error.
+
+#### Functional Validations
+| # | Scenario | Expected Result | Pass Condition | Test ID |
+|---|----------|-----------------|----------------|---------|
+| 1 | Link payment row to a valid Sales Invoice | SI field set on row; SI Advance entry created | row.sales_invoice == si_name and si.advances has row | TEST-015 |
+| 2 | Link payment row already linked to an SI | Blocked | frappe.ValidationError raised, no change to SI | TEST-015 |
+| 3 | Link payment row with amount = 0 | Blocked | frappe.ValidationError raised before any write | TEST-015 |
+| 4 | Link payment row to SI for a different customer | Blocked | frappe.ValidationError raised | TEST-015 |
+| 5 | Replay linking action for same row and same SI | Idempotent or blocked | SI Advance entry count unchanged | TEST-015 |
 
 ### Phase 6: Razorpay Charges Accounting Options
 #### Objective
@@ -332,10 +385,11 @@ Ensure reconciliation integrity and deployment safety.
 1. Phase 1: AET-REQ-003, XAPP-REQ-003, XAPP-REQ-004, XAPP-REQ-008, XAPP-REQ-009
 2. Phase 2: PAY-REQ-001, PAY-REQ-002
 3. Phase 3: AET-REQ-001, AET-REQ-002, PAY-REQ-003, PAY-REQ-004, PAY-REQ-005, PAY-REQ-006, PAY-REQ-007, PAY-REQ-008
-4. Phase 4: XAPP-REQ-001, XAPP-REQ-002, XAPP-REQ-003, XAPP-REQ-004, XAPP-REQ-005, XAPP-REQ-006, XAPP-REQ-007, XAPP-REQ-011, XAPP-REQ-012
-5. Phase 5: AET-REQ-004
-6. Phase 6: PAY-REQ-009, PAY-REQ-010, PAY-REQ-011
-7. Phase 7: Consolidated validation for all requirements
+4. Phase 4: XAPP-REQ-001, XAPP-REQ-002, XAPP-REQ-003, XAPP-REQ-004, XAPP-REQ-005, XAPP-REQ-006, XAPP-REQ-007, XAPP-REQ-011, XAPP-REQ-012, AET-REQ-005
+5. Phase 5: AET-REQ-004, AET-REQ-007
+6. Phase 5b: AET-REQ-006
+7. Phase 6: PAY-REQ-009, PAY-REQ-010, PAY-REQ-011
+8. Phase 7: Consolidated validation for all requirements
 
 ## Verification Matrix
 1. TEST-001: APR partial amount validation rejects zero, negative, and above outstanding.
@@ -351,6 +405,9 @@ Ensure reconciliation integrity and deployment safety.
 11. TEST-011: Charges accounting Option A posts correct Dr/Cr.
 12. TEST-012: Charges accounting Option B creates one JV per transaction.
 13. TEST-013: Reconciliation report confirms no mismatch for partial/multiple payments.
+14. TEST-014: APR Payment Details child table populated with one row per successful payment; no row on failure or duplicate webhook.
+15. TEST-015: "Link Payment to SI" sets SI field on APR row and creates SI Advance entry; blocked on re-link, zero amount, or customer mismatch.
+16. TEST-016: Opening an existing SI auto-populates SI Advance child table from APR payment history without duplicates.
 
 ## Key File Anchors
 - payments/payments/payment_gateways/doctype/razorpay_settings/razorpay_settings.py
@@ -362,6 +419,8 @@ Ensure reconciliation integrity and deployment safety.
 - aetas_customization/aetas_customization/aetas_customization/doctype/aetas_advance_payment_receipt/aetas_advance_payment_receipt.js
 - aetas_customization/aetas_customization/aetas_customization/doctype/aetas_razorpay_payment_link/aetas_razorpay_payment_link.json
 - aetas_customization/aetas_customization/aetas_customization/doctype/aetas_razorpay_payment_link/aetas_razorpay_payment_link.py
+- aetas_customization/aetas_customization/aetas_customization/doctype/aetas_apr_payment_detail/aetas_apr_payment_detail.json
+- aetas_customization/aetas_customization/aetas_customization/doctype/aetas_apr_payment_detail/aetas_apr_payment_detail.py
 - aetas_customization/aetas_customization/aetas_customization/overrides/payment_entry.py
 - aetas_customization/aetas_customization/aetas_customization/overrides/sales_invoice.py
 - aetas_customization/aetas_customization/fixtures/custom_field.json
