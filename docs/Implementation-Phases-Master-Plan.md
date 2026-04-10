@@ -73,6 +73,12 @@ This plan fully captures the text BRD requirements for:
 16. XAPP-REQ-007: Send failure notification to customer.
   - Acceptance: Failure communication is attempted and logged.
 
+### Observability and Audit Logging
+17. XAPP-REQ-013: Log every outbound payment-link generation request and response.
+  - Acceptance: For each APR/SI payment-link attempt, one activity log row exists with request payload, status, and API response or error.
+18. XAPP-REQ-014: Log all inbound Razorpay webhooks and enforce idempotency.
+  - Acceptance: Every incoming webhook is logged; duplicate events are marked and skipped without duplicate financial postings.
+
 ### Sales Invoice Flow
 17. PAY-REQ-007: Generate payment link from Sales Invoice for full or partial amount.
   - Acceptance: Link can be generated from invoice with amount validation.
@@ -128,7 +134,7 @@ This plan fully captures the text BRD requirements for:
 2. aetas_customization owned:
   - AET-REQ-001, AET-REQ-002, AET-REQ-003, AET-REQ-004, AET-REQ-005, AET-REQ-006, AET-REQ-007
 3. cross-app collaboration:
-  - XAPP-REQ-001 through XAPP-REQ-012 (XAPP-REQ-001 amended to include APR Payment Detail row insertion)
+  - XAPP-REQ-001 through XAPP-REQ-014 (XAPP-REQ-001 amended to include APR Payment Detail row insertion)
 
 ## Phased Implementation Plan
 
@@ -202,6 +208,7 @@ Implement link generation for APR and Sales Invoice with amount/mode/expiry cont
 6. Add `create_payment_link()` instance method to `RazorpaySettings` — calls `/v1/payment_links`, enforces allowed modes (Card Credit/Debit, Net Banking, UPI), sets `accept_partial=False` and `expire_by`.
 7. Create `Aetas Razorpay Payment Link` doctype (autoname `ARPL-.#####`) as audit-trail tracker per generated link.
 8. Add `Sales Invoice-custom_boutique` (Link→Boutique) custom field via fixtures.
+9. Log outbound payment-link generation request/response for APR and Sales Invoice flows.
 
 #### Exit Criteria
 1. Valid links generated for full and partial amounts.
@@ -209,6 +216,7 @@ Implement link generation for APR and Sales Invoice with amount/mode/expiry cont
 3. Link controls applied consistently.
 4. Each generated link produces one `Aetas Razorpay Payment Link` tracker record.
 5. `bench migrate` completes cleanly after schema additions.
+6. One outbound activity-log row is created per payment-link generation attempt with final status Processed/Failed.
 
 #### Functional Validations
 | # | Scenario | Expected Result | Pass Condition | Test ID |
@@ -224,6 +232,7 @@ Implement link generation for APR and Sales Invoice with amount/mode/expiry cont
 | 9 | Use same link after successful payment | Reuse blocked | Razorpay returns expired/used status, system handles gracefully | TEST-005 |
 | 10 | Generate additional link while outstanding > 0 | Link created successfully | New link URL returned | TEST-006 |
 | 11 | Attempt link generation when outstanding == 0 | Blocked | frappe.ValidationError raised | TEST-006 |
+| 12 | Generate link request raises Razorpay/API error | Outbound activity log captures failed attempt | activity_log.direction == "Outbound" and activity_log.processing_status == "Failed" | TEST-017 |
 
 ### Phase 4: Webhook Processing and Financial Posting
 #### Objective
@@ -239,12 +248,15 @@ Complete success/failure event processing with automatic accounting artifacts.
 3. On failure: mark Failed without financial impact.
 4. Send success/failure notifications where email exists.
 5. After creating Payment Entry, insert one APR Payment Detail child row on the source APR (Payment Entry name, amount, SI field blank).
+6. Log every inbound webhook payload before dispatch and update final processing status.
+7. Mark duplicate webhook events and skip financial re-processing.
 
 #### Exit Criteria
 1. One success event produces one Payment Entry.
 2. Failure produces no posting.
 3. Status and outstanding values match transaction ledger.
 4. APR Payment Details child table has exactly one row per successful payment; no row added on failure or duplicate webhook.
+5. One inbound activity-log row exists per webhook receipt with Processed/Failed/Duplicate status.
 
 #### Functional Validations
 | # | Scenario | Expected Result | Pass Condition | Test ID |
@@ -261,6 +273,8 @@ Complete success/failure event processing with automatic accounting artifacts.
 | 10 | Successful webhook: APR Payment Detail row inserted | One child row with correct PE name and amount | child_table.count == payments_count, row.payment_entry == PE.name | TEST-014 |
 | 11 | Replay duplicate successful webhook | No second child row inserted | APR Payment Details row count unchanged | TEST-014 |
 | 12 | Failure webhook received | No APR Payment Detail row inserted | child_table.count unchanged | TEST-014 |
+| 13 | Receive webhook event | Inbound activity log created before dispatch | activity_log.direction == "Inbound" and activity_log.processing_status in ("Processed", "Failed", "Duplicate") | TEST-017 |
+| 14 | Replay same webhook event ID | Duplicate marked and financial artifacts unchanged | activity_log.processing_status == "Duplicate" and count(PE) unchanged | TEST-017 |
 
 ### Phase 5: Advance Adjustment Prompt in Sales Invoice
 #### Objective
@@ -384,8 +398,8 @@ Ensure reconciliation integrity and deployment safety.
 ## Requirement to Phase Traceability
 1. Phase 1: AET-REQ-003, XAPP-REQ-003, XAPP-REQ-004, XAPP-REQ-008, XAPP-REQ-009
 2. Phase 2: PAY-REQ-001, PAY-REQ-002
-3. Phase 3: AET-REQ-001, AET-REQ-002, PAY-REQ-003, PAY-REQ-004, PAY-REQ-005, PAY-REQ-006, PAY-REQ-007, PAY-REQ-008
-4. Phase 4: XAPP-REQ-001, XAPP-REQ-002, XAPP-REQ-003, XAPP-REQ-004, XAPP-REQ-005, XAPP-REQ-006, XAPP-REQ-007, XAPP-REQ-011, XAPP-REQ-012, AET-REQ-005
+3. Phase 3: AET-REQ-001, AET-REQ-002, PAY-REQ-003, PAY-REQ-004, PAY-REQ-005, PAY-REQ-006, PAY-REQ-007, PAY-REQ-008, XAPP-REQ-013
+4. Phase 4: XAPP-REQ-001, XAPP-REQ-002, XAPP-REQ-003, XAPP-REQ-004, XAPP-REQ-005, XAPP-REQ-006, XAPP-REQ-007, XAPP-REQ-011, XAPP-REQ-012, XAPP-REQ-014, AET-REQ-005
 5. Phase 5: AET-REQ-004, AET-REQ-007
 6. Phase 5b: AET-REQ-006
 7. Phase 6: PAY-REQ-009, PAY-REQ-010, PAY-REQ-011
@@ -408,6 +422,7 @@ Ensure reconciliation integrity and deployment safety.
 14. TEST-014: APR Payment Details child table populated with one row per successful payment; no row on failure or duplicate webhook.
 15. TEST-015: "Link Payment to SI" sets SI field on APR row and creates SI Advance entry; blocked on re-link, zero amount, or customer mismatch.
 16. TEST-016: Opening an existing SI auto-populates SI Advance child table from APR payment history without duplicates.
+17. TEST-017: Outbound payment-link attempts and inbound webhooks are activity-logged with final status and duplicate-event idempotency.
 
 ## Key File Anchors
 - payments/payments/payment_gateways/doctype/razorpay_settings/razorpay_settings.py
@@ -421,8 +436,12 @@ Ensure reconciliation integrity and deployment safety.
 - aetas_customization/aetas_customization/aetas_customization/doctype/aetas_razorpay_payment_link/aetas_razorpay_payment_link.py
 - aetas_customization/aetas_customization/aetas_customization/doctype/aetas_apr_payment_detail/aetas_apr_payment_detail.json
 - aetas_customization/aetas_customization/aetas_customization/doctype/aetas_apr_payment_detail/aetas_apr_payment_detail.py
+- aetas_customization/aetas_customization/aetas_customization/doctype/aetas_razorpay_activity_log/aetas_razorpay_activity_log.json
+- aetas_customization/aetas_customization/aetas_customization/doctype/aetas_razorpay_activity_log/aetas_razorpay_activity_log.py
 - aetas_customization/aetas_customization/aetas_customization/overrides/payment_entry.py
 - aetas_customization/aetas_customization/aetas_customization/overrides/sales_invoice.py
+- aetas_customization/aetas_customization/aetas_customization/api/razorpay_activity_log.py
+- aetas_customization/aetas_customization/aetas_customization/api/webhook.py
 - aetas_customization/aetas_customization/fixtures/custom_field.json
 
 ## Execution Template (Per Phase)

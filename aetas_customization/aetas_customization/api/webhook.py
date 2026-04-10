@@ -8,6 +8,13 @@ import frappe
 from frappe.utils import now_datetime
 from frappe import _
 
+from aetas_customization.aetas_customization.api.razorpay_activity_log import (
+	compute_payload_hash,
+	create_activity_log,
+	get_duplicate_inbound_log,
+	update_activity_log,
+)
+
 
 @frappe.whitelist(allow_guest=True)
 def handle_razorpay_webhook():
@@ -17,37 +24,84 @@ def handle_razorpay_webhook():
 	
 	Expected webhook signature validation via HMAC-SHA256.
 	"""
+	activity_log = None
 	try:
-		# Get request data
 		request = frappe.request
-		body = request.get_data(as_text=True) if isinstance(request.get_data(), bytes) else request.data
-		
-		# Parse JSON payload
-		payload = json.loads(body) if isinstance(body, str) else body
-		event = payload.get("event")
-		
-		if not event:
-			frappe.logger().error(f"Razorpay webhook: Missing event type")
+		body = request.get_data(as_text=True)
+		headers = request.headers or {}
+		event_id = headers.get("X-Razorpay-Event-Id")
+		payload_hash = compute_payload_hash(body)
+		source_ip = headers.get("X-Forwarded-For") or getattr(request, "remote_addr", "")
+
+		payload = json.loads(body) if body else {}
+		event = payload.get("event") or "unknown"
+
+		activity_log = create_activity_log(
+			direction="Inbound",
+			activity_type=event,
+			processing_status="Received",
+			event_id=event_id,
+			payload_hash=payload_hash,
+			source_ip=source_ip,
+			request_payload=payload,
+		)
+
+		dedup_log = get_duplicate_inbound_log(
+			event_id=event_id,
+			payload_hash=payload_hash,
+			exclude_name=activity_log,
+		)
+		if dedup_log:
+			update_activity_log(
+				activity_log,
+				processing_status="Duplicate",
+				duplicate_of=dedup_log,
+				response_payload={"status": "duplicate", "duplicate_of": dedup_log},
+			)
+			frappe.logger().info(
+				f"Razorpay webhook duplicate detected: {event_id or payload_hash}"
+			)
+			return {"status": "success", "duplicate": True}, 200
+
+		if event == "unknown":
+			update_activity_log(
+				activity_log,
+				processing_status="Failed",
+				error_message="Missing event type",
+			)
 			return {"status": "error", "message": "Missing event type"}, 400
-		
+
 		frappe.logger().info(f"Razorpay webhook received: {event}")
-		
-		# Dispatch based on event type
+
 		if event == "payment_link.paid":
-			_handle_payment_link_paid(payload)
-			return {"status": "success"}, 200
+			result = _handle_payment_link_paid(payload)
 		elif event == "payment_link.cancelled":
-			_handle_payment_link_cancelled(payload)
-			return {"status": "success"}, 200
+			result = _handle_payment_link_cancelled(payload)
 		elif event == "payment.failed":
-			_handle_payment_failed(payload)
-			return {"status": "success"}, 200
+			result = _handle_payment_failed(payload)
 		else:
+			result = {"status": "ignored", "message": f"Unhandled event: {event}"}
 			frappe.logger().warning(f"Razorpay webhook: Unhandled event type: {event}")
-			return {"status": "success"}, 200
-			
+
+		update_activity_log(
+			activity_log,
+			processing_status="Processed",
+			response_payload=result,
+			link_id=(result or {}).get("link_id"),
+			payment_id=(result or {}).get("payment_id"),
+			reference_doctype=(result or {}).get("reference_doctype"),
+			reference_docname=(result or {}).get("reference_docname"),
+		)
+		return {"status": "success"}, 200
+
 	except Exception as e:
 		frappe.logger().error(f"Razorpay webhook handler error: {str(e)}")
+		if activity_log:
+			update_activity_log(
+				activity_log,
+				processing_status="Failed",
+				error_message=str(e),
+			)
 		return {"status": "error", "message": str(e)}, 500
 
 
@@ -57,7 +111,7 @@ def _validate_webhook_signature(payload_str, signature, webhook_secret):
 	"""
 	if not webhook_secret:
 		frappe.logger().warning("Razorpay webhook: No webhook secret configured")
-		throw(_("Razorpay webhook secret not configured for this boutique"))
+		frappe.throw(_("Razorpay webhook secret not configured for this boutique"))
 	
 	expected_signature = hmac.new(
 		webhook_secret.encode(),
@@ -67,7 +121,7 @@ def _validate_webhook_signature(payload_str, signature, webhook_secret):
 	
 	if not hmac.compare_digest(expected_signature, signature):
 		frappe.logger().error("Razorpay webhook: Signature validation failed")
-		throw(_("Webhook signature validation failed"))
+		frappe.throw(_("Webhook signature validation failed"))
 
 
 def _handle_payment_link_paid(payload):
@@ -82,7 +136,7 @@ def _handle_payment_link_paid(payload):
 		
 		if not razorpay_link_id:
 			frappe.logger().error("Razorpay webhook: Missing payment_link.id")
-			throw(_("Missing payment link ID in webhook payload"))
+			frappe.throw(_("Missing payment link ID in webhook payload"))
 		
 		# Look up the ARPL tracker record
 		arpl = frappe.db.get_value(
@@ -94,18 +148,24 @@ def _handle_payment_link_paid(payload):
 		
 		if not arpl:
 			frappe.logger().warning(f"Razorpay webhook: No ARPL found for link_id {razorpay_link_id}")
-			throw(_("No payment link record found for link ID {0}").format(razorpay_link_id))
+			frappe.throw(_("No payment link record found for link ID {0}").format(razorpay_link_id))
 		
 		# Idempotency guard — if already paid, skip
 		if arpl.status == "Paid":
 			frappe.logger().info(f"Razorpay webhook: ARPL {arpl.name} already paid, skipping")
-			return
+			return {
+				"status": "already_paid",
+				"link_id": razorpay_link_id,
+				"reference_doctype": arpl.reference_doctype,
+				"reference_docname": arpl.reference_docname,
+			}
 		
 		# Create Payment Entry
 		source_doctype = arpl.reference_doctype
 		source_docname = arpl.reference_docname
 		
-		pe = _create_payment_entry(arpl, amount, razorpay_payment_id)
+		resolved_amount = amount or int((arpl.amount or 0) * 100)
+		pe = _create_payment_entry(arpl, resolved_amount, razorpay_payment_id)
 		frappe.logger().info(f"Razorpay webhook: Created Payment Entry {pe.name} for {source_doctype} {source_docname}")
 		
 		# Update ARPL status
@@ -123,7 +183,7 @@ def _handle_payment_link_paid(payload):
 			source_doc = frappe.get_doc(source_doctype, source_docname)
 			source_doc.append("payment_details", {
 				"payment_entry": pe.name,
-				"amount": amount / 100.0,  # Razorpay returns amount in paise
+				"amount": resolved_amount / 100.0,  # Razorpay returns amount in paise
 				"sales_invoice": None
 			})
 			source_doc.save(ignore_permissions=True)
@@ -134,6 +194,13 @@ def _handle_payment_link_paid(payload):
 		
 		# Queue notification if customer has email
 		_queue_success_notification(source_doctype, source_docname, pe.name)
+		return {
+			"status": "paid",
+			"link_id": razorpay_link_id,
+			"payment_id": razorpay_payment_id,
+			"reference_doctype": source_doctype,
+			"reference_docname": source_docname,
+		}
 		
 	except Exception as e:
 		frappe.logger().error(f"Razorpay webhook: Error handling payment_link.paid: {str(e)}")
@@ -150,7 +217,7 @@ def _handle_payment_link_cancelled(payload):
 		
 		if not razorpay_link_id:
 			frappe.logger().error("Razorpay webhook: Missing payment_link.id in cancelled event")
-			return
+			return {"status": "ignored"}
 		
 		# Look up ARPL
 		arpl = frappe.db.get_value(
@@ -161,7 +228,7 @@ def _handle_payment_link_cancelled(payload):
 		)
 		
 		if not arpl:
-			return
+			return {"status": "missing_tracker", "link_id": razorpay_link_id}
 		
 		# Update ARPL status
 		frappe.db.set_value(
@@ -180,9 +247,17 @@ def _handle_payment_link_cancelled(payload):
 			)
 			_queue_failure_notification(arpl.reference_doctype, arpl.reference_docname)
 			frappe.logger().info(f"Razorpay webhook: Updated {arpl.reference_doctype} {arpl.reference_docname} status to Failed")
+
+		return {
+			"status": "cancelled",
+			"link_id": razorpay_link_id,
+			"reference_doctype": arpl.reference_doctype,
+			"reference_docname": arpl.reference_docname,
+		}
 		
 	except Exception as e:
 		frappe.logger().error(f"Razorpay webhook: Error handling payment_link.cancelled: {str(e)}")
+		raise
 
 
 def _handle_payment_failed(payload):
@@ -195,7 +270,7 @@ def _handle_payment_failed(payload):
 		
 		if not razorpay_payment_id:
 			frappe.logger().error("Razorpay webhook: Missing payment.id in failed event")
-			return
+			return {"status": "ignored"}
 		
 		# Find ARPL by razorpay_payment_id
 		arpl = frappe.db.get_value(
@@ -208,7 +283,7 @@ def _handle_payment_failed(payload):
 		if not arpl:
 			# Payment failed before link capture — nothing to update
 			frappe.logger().warning(f"Razorpay webhook: No ARPL found for payment {razorpay_payment_id}")
-			return
+			return {"status": "missing_tracker", "payment_id": razorpay_payment_id}
 		
 		# Update ARPL
 		frappe.db.set_value(
@@ -227,9 +302,17 @@ def _handle_payment_failed(payload):
 			)
 			_queue_failure_notification(arpl.reference_doctype, arpl.reference_docname)
 			frappe.logger().info(f"Razorpay webhook: Updated {arpl.reference_doctype} {arpl.reference_docname} status to Failed")
+
+		return {
+			"status": "failed",
+			"payment_id": razorpay_payment_id,
+			"reference_doctype": arpl.reference_doctype,
+			"reference_docname": arpl.reference_docname,
+		}
 		
 	except Exception as e:
 		frappe.logger().error(f"Razorpay webhook: Error handling payment.failed: {str(e)}")
+		raise
 
 
 def _create_payment_entry(arpl, amount, razorpay_payment_id):

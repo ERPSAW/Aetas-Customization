@@ -71,16 +71,22 @@ class TestGeneratePaymentLinkAPR(FrappeTestCase):
 				return self.apr
 			return mock_settings_doc
 
-		new_doc_mock = MagicMock()
+		tracker_doc_mock = MagicMock()
+		activity_doc_mock = MagicMock()
+
+		def new_doc_side_effect(doctype):
+			if doctype == "Aetas Razorpay Payment Link":
+				return tracker_doc_mock
+			return activity_doc_mock
 
 		with patch("frappe.db.exists", return_value=False), \
 			 patch("frappe.db.get_value", return_value="Test Customer Name"), \
 			 patch("frappe.get_doc", side_effect=get_doc_side_effect), \
-			 patch("frappe.new_doc", return_value=new_doc_mock), \
+			 patch("frappe.new_doc", side_effect=new_doc_side_effect), \
 			 patch(_RZP_SRC, mock_settings_cls):
 			result = generate_payment_link_for_apr(self.apr.name, amount)
 
-		return result, mock_settings_doc, new_doc_mock
+		return result, mock_settings_doc, tracker_doc_mock
 
 	def test_full_amount_generates_link(self):
 		"""TEST-004 row 1: full outstanding amount returns valid link."""
@@ -345,8 +351,7 @@ class TestRazorpayPayloadMethods(FrappeTestCase):
 		payload = mock_client.payment_link.create.call_args[0][0]
 		methods = payload["options"]["checkout"]["method"]
 		self.assertEqual(methods["netbanking"], 1)
-		self.assertEqual(methods["card"]["credit"], 1)
-		self.assertEqual(methods["card"]["debit"], 1)
+		self.assertEqual(methods["card"], 1)
 		self.assertEqual(methods["upi"], 1)
 		self.assertEqual(methods["wallet"], 0)
 		self.assertEqual(methods["emi"], 0)

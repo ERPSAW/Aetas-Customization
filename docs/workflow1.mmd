@@ -24,11 +24,17 @@ flowchart TB
     RZP_EXCL --> RZP_PARTIAL
     RZP_PARTIAL --> RZP_EXP
     RZP_EXP --> API_CALL["Create payment link via Razorpay API"]
-    API_CALL --> TRACKER["Create one tracker record per link"] & WEBHOOK{"Webhook event \n received"}
+    API_CALL --> LOG_OUT["Log outbound link generation request/response"]
+    LOG_OUT --> TRACKER["Create one tracker record per link"] & WEBHOOK{"Webhook event \n received"}
     TRACKER --> OUT_CHECK{"Outstanding > 0?"}
     OUT_CHECK -- Yes --> LNK_ALLOW["Allow additional link generation"]
     OUT_CHECK -- No --> LNK_BLOCK["Block further link generation"]
-    WEBHOOK -- Success --> PAY_ENTRY["Create Payment Entry"]
+    WEBHOOK --> LOG_IN["Log inbound webhook payload"]
+    LOG_IN --> DEDUP{"Duplicate webhook?"}
+    DEDUP -- Yes --> DEDUP_SKIP["Mark Duplicate and skip financial processing"]
+    DEDUP -- No --> WEBHOOK_ROUTE{"Webhook outcome"}
+    WEBHOOK_ROUTE -- Success --> PAY_ENTRY["Create Payment Entry"]
+    WEBHOOK_ROUTE -- Failure --> ST_FAIL["Mark status Failed"]
     UPD_FIN["Update paid and outstanding amounts"] --> STATUS_DEC{"Status rule"} & EMAIL_CHECK_S{"Email exists?"}
     STATUS_DEC -- "paid = 0" --> ST_UNPAID["Unpaid"]
     STATUS_DEC -- 0 &lt; paid &lt; total --> ST_PARTIAL["Partially Paid"]
@@ -36,7 +42,6 @@ flowchart TB
     ST_PAID --> LNK_ONCE["Mark link as one-time used"]
     EMAIL_CHECK_S -- Yes --> SEND_SUCC["Send success notification"]
     EMAIL_CHECK_S -- No --> SKIP_S["Skip notification"]
-    WEBHOOK -- Failure --> ST_FAIL["Mark status Failed"]
     ST_FAIL --> NO_POST["No financial posting"]
     NO_POST --> EMAIL_CHECK_F{"Email exists?"}
     EMAIL_CHECK_F -- Yes --> SEND_FAIL["Send failure notification"]

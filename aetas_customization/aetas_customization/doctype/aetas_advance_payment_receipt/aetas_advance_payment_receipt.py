@@ -8,6 +8,11 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import flt
 
+from aetas_customization.aetas_customization.api.razorpay_activity_log import (
+	create_activity_log,
+	update_activity_log,
+)
+
 
 class AetasAdvancePaymentReceipt(Document):
 	def validate(self):
@@ -95,16 +100,35 @@ def generate_payment_link_for_apr(apr_name, amount):
 		frappe.db.get_value("Customer", apr.customer, "customer_name") or apr.customer
 	)
 
-	link = settings_doc.create_payment_link(
-		amount_inr=amount,
-		currency="INR",
-		customer_name=customer_name,
-		customer_contact="",
-		customer_email="",
-		description="Payment for Advance Receipt " + apr_name,
+	request_payload = {
+		"amount_inr": amount,
+		"currency": "INR",
+		"customer_name": customer_name,
+		"customer_contact": "",
+		"customer_email": "",
+		"description": "Payment for Advance Receipt " + apr_name,
+		"reference_doctype": "Aetas Advance Payment Receipt",
+		"reference_docname": apr_name,
+	}
+	activity_log = create_activity_log(
+		direction="Outbound",
+		activity_type="payment_link.create",
+		processing_status="Received",
 		reference_doctype="Aetas Advance Payment Receipt",
 		reference_docname=apr_name,
+		amount=amount,
+		request_payload=request_payload,
 	)
+
+	try:
+		link = settings_doc.create_payment_link(**request_payload)
+	except Exception as e:
+		update_activity_log(
+			activity_log,
+			processing_status="Failed",
+			error_message=str(e),
+		)
+		raise
 
 	expire_by_dt = None
 	if link.get("expire_by"):
@@ -122,6 +146,13 @@ def generate_payment_link_for_apr(apr_name, amount):
 	if expire_by_dt:
 		tracker.expire_by = expire_by_dt
 	tracker.insert(ignore_permissions=True)
+
+	update_activity_log(
+		activity_log,
+		processing_status="Processed",
+		response_payload=link,
+		link_id=link.get("id"),
+	)
 
 	return {
 		"link_url": link.get("short_url"),

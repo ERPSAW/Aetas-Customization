@@ -22,7 +22,7 @@ frappe.ui.form.on('Aetas Advance Payment Receipt', {
 					}],
 					function(values) {
 						frappe.call({
-							method: "aetas_customization.aetas_customization.aetas_customization.doctype.aetas_advance_payment_receipt.aetas_advance_payment_receipt.generate_payment_link_for_apr",
+							method: "aetas_customization.aetas_customization.doctype.aetas_advance_payment_receipt.aetas_advance_payment_receipt.generate_payment_link_for_apr",
 							args: {
 								apr_name: frm.doc.name,
 								amount: values.amount,

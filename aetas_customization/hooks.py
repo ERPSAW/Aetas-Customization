@@ -255,6 +255,12 @@ doc_events = {
 # ],
 # }
 
+scheduler_events = {
+    "daily": [
+        "aetas_customization.aetas_customization.api.razorpay_activity_log.cleanup_old_activity_logs"
+    ]
+}
+
 # Testing
 # -------
 
