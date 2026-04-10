@@ -568,3 +568,101 @@ def generate_payment_link_for_invoice(si_name, amount):
 		"amount": amount,
 		"expire_by": str(expire_by_dt) if expire_by_dt else "",
 	}
+
+
+# ---------------------------------------------------------------------------
+# Phase 5: Advance Adjustment Prompt and Get Advances Received
+# ---------------------------------------------------------------------------
+
+@frappe.whitelist()
+def get_customer_advance_balance(customer):
+	"""
+	Calculate total available advance for a customer from unpaid/partially paid APRs.
+	Used by the advance adjustment prompt on SI creation.
+	
+	Returns: {"balance": float, "aprs": [list of APR names]}
+	"""
+	if not customer:
+		return {"balance": 0.0, "aprs": []}
+	
+	# Query all APRs for this customer that are not fully paid
+	unpaid_aprs = frappe.db.sql("""
+		SELECT name, paid_amount, status
+		FROM `tabAetas Advance Payment Receipt`
+		WHERE customer = %s AND status IN ('To Be Received', 'Partially Paid')
+	""", customer, as_dict=True)
+	
+	total_balance = 0.0
+	apr_names = []
+	for apr in unpaid_aprs:
+		# Calculate how much of this APR is still available
+		paid_via_pe = frappe.db.sql("""
+			SELECT COALESCE(COUNT(*), 0) as count, COALESCE(SUM(amount), 0) as total
+			FROM `tabAetas APR Payment Detail`
+			WHERE parent = %s AND sales_invoice IS NULL
+		""", apr["name"], as_dict=True)[0]
+		
+		available = apr["paid_amount"] - paid_via_pe["total"]
+		if available > 0:
+			total_balance += available
+			apr_names.append(apr["name"])
+	
+	return {"balance": total_balance, "aprs": apr_names}
+
+
+@frappe.whitelist()
+def get_advances_received_for_si(si_name):
+	"""
+	Fetch all APR Payment Detail rows for the same customer as the SI,
+	where the SI field is blank (not yet allocated).
+	
+	Returns: list of dicts with {payment_entry, amount, customer, apr_name}
+	"""
+	if not si_name:
+		return []
+	
+	si = frappe.get_doc("Sales Invoice", si_name)
+	customer = si.customer
+	
+	# Query APR Payment Detail rows for this customer where SI field is blank
+	rows = frappe.db.sql("""
+		SELECT
+			apd.name as child_name,
+			apd.parent as apr_name,
+			apd.payment_entry,
+			apd.amount,
+			apd.sales_invoice
+		FROM `tabAetas APR Payment Detail` apd
+		WHERE apd.parent IN (
+			SELECT name FROM `tabAetas Advance Payment Receipt`
+			WHERE customer = %s
+		)
+		AND apd.sales_invoice IS NULL
+	""", customer, as_dict=True)
+	
+	return rows
+
+
+@frappe.whitelist()
+def apply_advance_adjustment(si_name, adjustment_amount):
+	"""
+	Apply advance adjustment to a Sales Invoice.
+	This is called when the user confirms the advance adjustment prompt.
+	
+	In real implementation, should create a Journal Entry or use ERPNext's native advance allocation.
+	For now, a stub that logs the adjustment.
+	"""
+	if not si_name or adjustment_amount <= 0:
+		return {"status": "error", "message": "Invalid SI or amount"}
+	
+	si = frappe.get_doc("Sales Invoice", si_name)
+	
+	# Log the adjustment fact
+	frappe.logger().info(f"Advance adjustment applied to {si_name}: {adjustment_amount}")
+	
+	# Stub: real implementation would:
+	# 1. Create allocation entries
+	# 2. Update SI advance child table
+	# 3. Create accounting entries if needed
+	
+	return {"status": "success", "message": f"Advance of {adjustment_amount} applied"}

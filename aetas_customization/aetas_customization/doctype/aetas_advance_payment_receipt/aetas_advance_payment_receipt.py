@@ -130,3 +130,69 @@ def generate_payment_link_for_apr(apr_name, amount):
 		"expire_by": str(expire_by_dt) if expire_by_dt else "",
 	}
 
+
+# ---------------------------------------------------------------------------
+# Phase 5b: Link APR Payment to Sales Invoice
+# ---------------------------------------------------------------------------
+
+@frappe.whitelist()
+def link_payment_to_si(apr_name, child_row_name, si_name):
+	"""
+	Link an APR Payment Detail row to a Sales Invoice.
+	Updates the SI field on the child row and creates an entry in SI Advance child table.
+	
+	Args:
+		apr_name (str): Name of the APR document
+		child_row_name (str): Name of the APR Payment Detail child row
+		si_name (str): Name of the target Sales Invoice
+	
+	Returns:
+		dict: {status, message}
+	"""
+	# Validate inputs
+	if not apr_name or not child_row_name or not si_name:
+		frappe.throw(_("Missing required parameters"))
+	
+	# Fetch the APR and child row
+	apr = frappe.get_doc("Aetas Advance Payment Receipt", apr_name)
+	child_row = None
+	for row in apr.payment_details:
+		if row.name == child_row_name:
+			child_row = row
+			break
+	
+	if not child_row:
+		frappe.throw(_("Payment Detail row not found"))
+	
+	# Validate the row is not already linked
+	if child_row.sales_invoice:
+		frappe.throw(_("This payment row is already linked to Sales Invoice {0}").format(child_row.sales_invoice))
+	
+	# Validate amount > 0
+	if not child_row.amount or child_row.amount <= 0:
+		frappe.throw(_("Cannot link payment row with zero or negative amount"))
+	
+	# Fetch the SI and validate customer match
+	si = frappe.get_doc("Sales Invoice", si_name)
+	if si.customer != apr.customer:
+		frappe.throw(_("Sales Invoice customer {0} does not match APR customer {1}").format(si.customer, apr.customer))
+	
+	# Update the child row's SI field
+	child_row.sales_invoice = si_name
+	apr.save(ignore_permissions=True)
+	
+	# Add an entry to the SI Advance child table
+	si.append("advances", {
+		"reference_type": "Aetas Advance Payment Receipt",
+		"reference_name": apr_name,
+		"advance_amount": child_row.amount,
+		"allocated_amount": 0,
+	})
+	si.save(ignore_permissions=True)
+	
+	return {
+		"status": "success",
+		"message": _("Payment linked to Sales Invoice {0}").format(si_name)
+	}
+
+

@@ -19,7 +19,8 @@
   "sales_person",
   "remarks",
   "mode_of_payment",
-  "utr_no"
+  "utr_no",
+  "payment_details"
  ],
  "fields": [
   {
@@ -91,6 +92,12 @@
    "label": "Payment Entry",
    "options": "Payment Entry",
    "read_only": 1
+  },
+  {
+   "fieldname": "payment_details",
+   "fieldtype": "Table",
+   "label": "Payment Details",
+   "options": "Aetas APR Payment Detail"
   }
  ],
  "index_web_pages_for_search": 1,

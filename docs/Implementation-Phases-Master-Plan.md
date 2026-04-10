@@ -1,4 +1,4 @@
-# Master Phased Implementation Plan (BRD-Complete, AI-Run Ready)
+# Master Phased Implementation Plan (BRD-Complete)
 
 ## Objective
 Provide a single, BRD-independent execution document for phased delivery of Razorpay integration with partial payments, scoped only to payments and aetas_customization.
@@ -425,7 +425,7 @@ Ensure reconciliation integrity and deployment safety.
 - aetas_customization/aetas_customization/aetas_customization/overrides/sales_invoice.py
 - aetas_customization/aetas_customization/fixtures/custom_field.json
 
-## AI Execution Template (Per Phase)
+## Execution Template (Per Phase)
 Use this template to create a child implementation plan for each phase.
 
 1. Phase Name:

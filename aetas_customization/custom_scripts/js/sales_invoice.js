@@ -34,7 +34,115 @@ frappe.ui.form.on('Sales Invoice', {
                 }
             }
 
-        })
+        });
+
+		// Phase 5 Sub-flow A: Advance adjustment prompt on SI creation
+		if (frm.is_new() && frm.doc.customer) {
+			frappe.call({
+				method: "aetas_customization.aetas_customization.overrides.sales_invoice.get_customer_advance_balance",
+				args: {
+					customer: frm.doc.customer
+				},
+				callback: function(r) {
+					if (r.message && r.message.balance > 0) {
+						const advance_balance = r.message.balance;
+						frappe.prompt(
+							[{
+								fieldname: "adjustment_option",
+								fieldtype: "Select",
+								label: __("Advance Adjustment"),
+								options: "Skip\nFull Adjust\nPartial Adjust",
+								default: "Skip",
+								reqd: 1,
+							}],
+							function(values) {
+								let adjustment_amount = 0;
+								
+								if (values.adjustment_option === "Full Adjust") {
+									adjustment_amount = Math.min(advance_balance, frm.doc.grand_total || 0);
+									frappe.call({
+										method: "aetas_customization.aetas_customization.overrides.sales_invoice.apply_advance_adjustment",
+										args: {
+											si_name: frm.doc.name,
+											adjustment_amount: adjustment_amount
+										},
+										callback: function(r) {
+											frappe.msgprint(__("Advance of {0} applied", [format_currency(adjustment_amount, "INR")]));
+										}
+									});
+								} else if (values.adjustment_option === "Partial Adjust") {
+									frappe.prompt(
+										[{
+											fieldname: "amount",
+											fieldtype: "Currency",
+											label: __("Adjustment Amount"),
+											reqd: 1,
+										}],
+										function(partial_values) {
+											if (partial_values.amount > advance_balance) {
+												frappe.msgprint(__("Amount exceeds available advance"));
+												return;
+											}
+											frappe.call({
+												method: "aetas_customization.aetas_customization.overrides.sales_invoice.apply_advance_adjustment",
+												args: {
+													si_name: frm.doc.name,
+													adjustment_amount: partial_values.amount
+												},
+												callback: function(r) {
+													frappe.msgprint(__("Advance of {0} applied", [format_currency(partial_values.amount, "INR")]));
+												}
+											});
+										},
+										__("Enter Adjustment Amount"),
+										__("Apply")
+									);
+								}
+								// else: Skip — do nothing
+							},
+							__("Advance Adjustment Available"),
+							__("Continue")
+						);
+					}
+				}
+			});
+		}
+
+		// Phase 5 Sub-flow B: Auto-populate SI Advance child table when opening existing SI
+		if (!frm.is_new() && frm.doc.customer) {
+			frappe.call({
+				method: "aetas_customization.aetas_customization.overrides.sales_invoice.get_advances_received_for_si",
+				args: {
+					si_name: frm.doc.name
+				},
+				callback: function(r) {
+					if (r.message && r.message.length > 0) {
+						// Check which rows are already in the advances child table
+						const existing_pes = (frm.doc.advances || []).map(row => row.name);
+						
+						r.message.forEach(adv_row => {
+							// Skip if already present (idempotency)
+							if (!existing_pes.includes(adv_row.payment_entry)) {
+								// Append to native ERPNext "advances" child table
+								// Using reference_type="Aetas Advance Payment Receipt", reference_name=apr_name
+								frm.add_child("advances", {
+									name: adv_row.payment_entry,
+									reference_type: "Aetas Advance Payment Receipt",
+									reference_name: adv_row.apr_name,
+									advance_amount: adv_row.amount,
+									allocated_amount: 0,
+								});
+							}
+						});
+						
+						if (r.message.length > 0) {
+							frm.refresh_field("advances");
+							frappe.msgprint(__("Advances populated from customer payment history"));
+						}
+					}
+				}
+			});
+		}
 
 		if (!frm.is_new() && frm.doc.docstatus === 1 && frm.doc.outstanding_amount > 0) {
 			frm.add_custom_button(__("Generate Payment Link"), function() {

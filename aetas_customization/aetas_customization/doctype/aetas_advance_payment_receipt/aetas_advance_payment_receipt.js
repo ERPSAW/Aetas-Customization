@@ -54,6 +54,70 @@ frappe.ui.form.on('Aetas Advance Payment Receipt', {
 				);
 			}, __("Razorpay"));
 		}
+
+		// Phase 5b: Link Payment to SI button
+		// Show only if there are unlinked payment rows
+		const unlinked_rows = (frm.doc.payment_details || []).filter(row => !row.sales_invoice);
+		if (!frm.is_new() && unlinked_rows.length > 0) {
+			frm.add_custom_button(__("Link Payment to SI"), function() {
+				// Build list of unlinked payment rows
+				const payment_options = unlinked_rows
+					.map(row => `${row.payment_entry} (${format_currency(row.amount, "INR")})`)
+					.join("\n");
+				
+				frappe.prompt(
+					[
+						{
+							fieldname: "payment_row",
+							fieldtype: "Select",
+							label: __("Select Payment"),
+							options: payment_options,
+							reqd: 1,
+						},
+						{
+							fieldname: "sales_invoice",
+							fieldtype: "Link",
+							label: __("Sales Invoice"),
+							options: "Sales Invoice",
+							filters: {
+								"customer": frm.doc.customer,
+								"docstatus": 1,
+							},
+							reqd: 1,
+						}
+					],
+					function(values) {
+						// Find the selected row name
+						const selected_payment = values.payment_row.split(" ")[0];  // Extract PE name
+						const selected_row = unlinked_rows.find(row => row.payment_entry === selected_payment);
+						
+						if (!selected_row) {
+							frappe.msgprint(__("Payment row not found"));
+							return;
+						}
+						
+						frappe.call({
+							method: "aetas_customization.aetas_customization.aetas_customization.doctype.aetas_advance_payment_receipt.aetas_advance_payment_receipt.link_payment_to_si",
+							args: {
+								apr_name: frm.doc.name,
+								child_row_name: selected_row.name,
+								si_name: values.sales_invoice,
+							},
+							freeze: true,
+							freeze_message: __("Linking payment…"),
+							callback: function(r) {
+								if (r.message && r.message.status === "success") {
+									frappe.msgprint(r.message.message);
+									frm.reload_doc();
+								}
+							},
+						});
+					},
+					__("Link Payment to Sales Invoice"),
+					__("Link")
+				);
+			}, __("Advanced"));
+		}
 	},
     onload:function(frm){
         if(frm.doc.payment_entry && frm.doc.status === "Received"){

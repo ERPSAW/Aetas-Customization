@@ -18,6 +18,19 @@ def _set_receipt_status(receipt_name, status, payment_entry=None):
 
 def on_submit(self, method=None):
     _set_receipt_status(self.custom_advance_payment_receipt, "Received", self.name)
+    
+    # Insert child row on APR Payment Details (for manually created Payment Entries)
+    if self.custom_advance_payment_receipt:
+        try:
+            apr = frappe.get_doc("Aetas Advance Payment Receipt", self.custom_advance_payment_receipt)
+            apr.append("payment_details", {
+                "payment_entry": self.name,
+                "amount": self.paid_amount or 0,
+                "sales_invoice": None
+            })
+            apr.save(ignore_permissions=True)
+        except Exception as e:
+            frappe.logger().warning(f"Could not insert APR Payment Detail row: {str(e)}")
 
 
 def on_cancel(self, method=None):

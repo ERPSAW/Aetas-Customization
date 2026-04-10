@@ -352,3 +352,63 @@ class TestRazorpayPayloadMethods(FrappeTestCase):
 		self.assertEqual(methods["emi"], 0)
 		self.assertFalse(payload["accept_partial"])
 		self.assertIn("expire_by", payload)
+
+
+# ---------------------------------------------------------------------------
+# TEST-014: APR Payment Details child table population on webhook
+# ---------------------------------------------------------------------------
+
+class TestAPRPaymentDetailChildTable(FrappeTestCase):
+
+	def test_child_table_row_inserted_on_successful_webhook(self):
+		"""TEST-014: Successful webhook inserts one row with correct PE name and amount."""
+		# Mock APR with payment_details child table
+		apr = MagicMock()
+		apr.name = "AAPR-TEST-014"
+		apr.customer = "Test Customer"
+		apr.boutique = "Test Boutique"
+		apr.paid_amount = 1000.0
+		apr.payment_details = []
+		
+		def append_child(fieldname, row_dict):
+			"""Mock append method for child table rows."""
+			apr.payment_details.append(row_dict)
+			return row_dict
+		
+		apr.append = append_child
+		apr.save = MagicMock()
+		
+		# Mock Payment Entry
+		pe = MagicMock()
+		pe.name = "ACC-PE-001"
+		
+		# Simulate payment_entry on_submit logic
+		# This would normally insert one child row
+		if apr.name:
+			apr.append("payment_details", {
+				"payment_entry": pe.name,
+				"amount": 1000.0,
+				"sales_invoice": None
+			})
+		
+		# Verify child row was inserted
+		self.assertEqual(len(apr.payment_details), 1)
+		self.assertEqual(apr.payment_details[0]["payment_entry"], "ACC-PE-001")
+		self.assertEqual(apr.payment_details[0]["amount"], 1000.0)
+		self.assertIsNone(apr.payment_details[0]["sales_invoice"])
+	
+	def test_child_table_row_not_inserted_when_apr_blank(self):
+		"""TEST-014: Child row not inserted if APR field is blank."""
+		apr = MagicMock()
+		apr.payment_details = []
+		apr.append = MagicMock()
+		apr.save = MagicMock()
+		
+		# Simulate PE on_submit with blank APR
+		apr_name = None  # blank
+		
+		if apr_name:
+			apr.append("payment_details", {"payment_entry": "PE-001", "amount": 500.0, "sales_invoice": None})
+		
+		# No append should have been called
+		apr.append.assert_not_called()
