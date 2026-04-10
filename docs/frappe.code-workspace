@@ -1,0 +1,20 @@
+{
+	"folders": [
+		{
+			"path": "../../frappe"
+		},
+		{
+			"path": "../../erpnext"
+		},
+		{
+			"path": "../../payments"
+		},
+		{
+			"path": ".."
+		},
+		{
+			"path": "../../crm_application_plugin"
+		}
+	],
+	"settings": {}
+}

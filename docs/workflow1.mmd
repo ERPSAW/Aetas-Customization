@@ -1,0 +1,57 @@
+flowchart TB
+ subgraph RZP_Settings["Payload Configuration"]
+        RZP_METH["Set methods: Card, Net Banking, UPI"]
+        RZP_PAYLOAD["Build Razorpay payment link payload"]
+        RZP_EXCL["Disable: Wallet, EMI"]
+        RZP_PARTIAL["Set accept_partial = false"]
+        RZP_EXP["Set expire_by from link_expiry_hours"]
+  end
+    START(["Start: User access App for APR or SI"]) --> ACT_DEC{"Action"}
+    ACT_DEC -- Open --> DOC_EXIST["User opens existing APR or SI"]
+    ACT_DEC -- Create --> DOC_NEW["User creates APR or SI"]
+    DOC_EXIST --> TYPE_EXIST{"Document type"}
+    DOC_NEW --> TYPE_NEW{"Document type"}
+    TYPE_NEW -- APR --> INPUT_APR["APR: Enter full or partial amount"]
+    TYPE_NEW -- Sales Invoice --> INPUT_SI["Invoice: Enter full or partial amount"]
+    INPUT_APR --> VAL_AMT{"Validate amount &gt; 0 &amp; &lt;= outstanding"}
+    INPUT_SI --> VAL_AMT
+    VAL_AMT -- Invalid --> ERR_VAL["Show validation error and stop"]
+    VAL_AMT -- Valid --> AUTH_CHECK{"Resolve boutique & \n Razorpay credentials"}
+    AUTH_CHECK -- Missing --> ERR_CONFIG["Show configuration error and stop"]
+    AUTH_CHECK -- Resolved --> RZP_PAYLOAD
+    RZP_PAYLOAD --> RZP_METH
+    RZP_METH --> RZP_EXCL
+    RZP_EXCL --> RZP_PARTIAL
+    RZP_PARTIAL --> RZP_EXP
+    RZP_EXP --> API_CALL["Create payment link via Razorpay API"]
+    API_CALL --> TRACKER["Create one tracker record per link"] & WEBHOOK{"Webhook event \n received"}
+    TRACKER --> OUT_CHECK{"Outstanding > 0?"}
+    OUT_CHECK -- Yes --> LNK_ALLOW["Allow additional link generation"]
+    OUT_CHECK -- No --> LNK_BLOCK["Block further link generation"]
+    WEBHOOK -- Success --> PAY_ENTRY["Create Payment Entry"]
+    UPD_FIN["Update paid and outstanding amounts"] --> STATUS_DEC{"Status rule"} & EMAIL_CHECK_S{"Email exists?"}
+    STATUS_DEC -- "paid = 0" --> ST_UNPAID["Unpaid"]
+    STATUS_DEC -- 0 &lt; paid &lt; total --> ST_PARTIAL["Partially Paid"]
+    STATUS_DEC -- "paid = total" --> ST_PAID["Paid"]
+    ST_PAID --> LNK_ONCE["Mark link as one-time used"]
+    EMAIL_CHECK_S -- Yes --> SEND_SUCC["Send success notification"]
+    EMAIL_CHECK_S -- No --> SKIP_S["Skip notification"]
+    WEBHOOK -- Failure --> ST_FAIL["Mark status Failed"]
+    ST_FAIL --> NO_POST["No financial posting"]
+    NO_POST --> EMAIL_CHECK_F{"Email exists?"}
+    EMAIL_CHECK_F -- Yes --> SEND_FAIL["Send failure notification"]
+    EMAIL_CHECK_F -- No --> SKIP_F["Skip notification"]
+    LNK_ALLOW --> WEBHOOK
+    TYPE_EXIST -- APR --> n1["APR: Action"]
+    n1 --> n2["Create Payment Link"] & n3["Link Payment to SI"]
+    TYPE_EXIST -- SI --> n4["SI: Get Advances Received"]
+    n2 --> AUTH_CHECK
+    PAY_ENTRY --> n5["Add Payment Details in APR Child Table (parent, Payment, Amount, SI)"]
+    n5 --> UPD_FIN
+    n3 --> n6["Select Payment Row in APR Payment Details Child Table"]
+    n6 --> n7["Update the Payment Details SI Field"]
+    n7 --> n8["Create an entry in SI Advance Child Table for SI"]
+    n4 --> n9["Fetch APR with Same Customer as SI"]
+    n9 --> n10["Fetch Payment Entries and add to SI Advance Child Table"]
+
+    n1@{ shape: diam}

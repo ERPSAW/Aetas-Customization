@@ -43,7 +43,8 @@ fixtures = [
                     "Customer-custom_customer_without_sales",
                     "Lead-custom_unqualified_reason",
                     "Customer-custom_journey",
-                    "Customer-custom_customer_journey"
+                    "Customer-custom_customer_journey",
+                    "Sales Invoice-custom_boutique",
                 ],
             ]
         ],
@@ -202,6 +203,7 @@ doc_events = {
     },
     "Payment Entry": {
         "on_submit": "aetas_customization.aetas_customization.overrides.payment_entry.on_submit",
+        "on_cancel": "aetas_customization.aetas_customization.overrides.payment_entry.on_cancel",
     },
     "Stock Entry": {
         "before_validate": "aetas_customization.aetas_customization.overrides.stock_entry.before_validate",

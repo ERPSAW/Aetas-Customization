@@ -463,3 +463,108 @@ def validate_coupon_code(coupon_code, items, grand_total):
         "final_total": final_total,
         "breakdown": breakdown,
     }
+
+
+
+@frappe.whitelist()
+def generate_payment_link_for_invoice(si_name, amount):
+	"""
+	Generate a Razorpay payment link for a Sales Invoice.
+
+	Args:
+		si_name (str): Name of the Sales Invoice document.
+		amount (float): Amount in INR to generate the link for.
+
+	Returns:
+		dict: {link_url, link_id, amount, expire_by}
+	"""
+	import datetime
+
+	from frappe.utils import flt
+
+	from payments.payment_gateways.doctype.razorpay_settings.razorpay_settings import (
+		RazorpaySettings,
+	)
+
+	amount = flt(amount)
+	si = frappe.get_doc("Sales Invoice", si_name)
+
+	if frappe.db.exists(
+		"Aetas Razorpay Payment Link",
+		{"reference_docname": si_name, "status": "Paid"},
+	):
+		frappe.throw(
+			_("A payment has already been completed for this Sales Invoice.")
+		)
+
+	# Compute outstanding from submitted Payment Entry References
+	paid = frappe.db.sql(
+		"""
+		SELECT COALESCE(SUM(per.allocated_amount), 0)
+		FROM `tabPayment Entry Reference` per
+		JOIN `tabPayment Entry` pe ON pe.name = per.parent
+		WHERE per.reference_doctype = 'Sales Invoice'
+		  AND per.reference_name = %s
+		  AND pe.docstatus = 1
+		""",
+		si_name,
+	)[0][0]
+	outstanding = flt(si.grand_total) - flt(paid)
+
+	if amount <= 0:
+		frappe.throw(_("Payment amount must be greater than zero."))
+	if amount > outstanding:
+		frappe.throw(
+			_("Payment amount {0} exceeds outstanding amount {1}.").format(
+				frappe.format_value(amount, {"fieldtype": "Currency"}),
+				frappe.format_value(outstanding, {"fieldtype": "Currency"}),
+			)
+		)
+
+	boutique = si.get("custom_boutique")
+	if not boutique:
+		frappe.throw(_("Boutique is not set on this Sales Invoice."))
+
+	settings_dict = RazorpaySettings.get_settings_for_boutique(boutique)
+	settings_doc = frappe.get_doc("Razorpay Settings", settings_dict["doc_name"])
+	settings_doc.init_client()
+
+	customer_name = (
+		frappe.db.get_value("Customer", si.customer, "customer_name") or si.customer
+	)
+	customer_email = getattr(si, "contact_email", "") or ""
+
+	link = settings_doc.create_payment_link(
+		amount_inr=amount,
+		currency=si.currency or "INR",
+		customer_name=customer_name,
+		customer_contact="",
+		customer_email=customer_email,
+		description="Payment for Invoice " + si_name,
+		reference_doctype="Sales Invoice",
+		reference_docname=si_name,
+	)
+
+	expire_by_dt = None
+	if link.get("expire_by"):
+		expire_by_dt = datetime.datetime.utcfromtimestamp(link["expire_by"])
+
+	tracker = frappe.new_doc("Aetas Razorpay Payment Link")
+	tracker.reference_doctype = "Sales Invoice"
+	tracker.reference_docname = si_name
+	tracker.boutique = boutique
+	tracker.amount = amount
+	tracker.currency = si.currency or "INR"
+	tracker.link_id = link.get("id")
+	tracker.link_url = link.get("short_url")
+	tracker.status = "Created"
+	if expire_by_dt:
+		tracker.expire_by = expire_by_dt
+	tracker.insert(ignore_permissions=True)
+
+	return {
+		"link_url": link.get("short_url"),
+		"link_id": link.get("id"),
+		"amount": amount,
+		"expire_by": str(expire_by_dt) if expire_by_dt else "",
+	}

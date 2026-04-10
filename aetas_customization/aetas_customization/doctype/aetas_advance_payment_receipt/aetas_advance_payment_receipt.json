@@ -10,6 +10,7 @@
  "field_order": [
   "status",
   "customer",
+  "boutique",
   "cost_center",
   "date",
   "paid_amount",
@@ -26,6 +27,13 @@
    "fieldtype": "Link",
    "label": "Customer",
    "options": "Customer"
+  },
+  {
+   "fieldname": "boutique",
+   "fieldtype": "Link",
+   "label": "Boutique",
+   "options": "Boutique",
+   "reqd": 1
   },
   {
    "fieldname": "cost_center",

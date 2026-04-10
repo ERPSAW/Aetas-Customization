@@ -1,16 +1,36 @@
-
 import frappe
-from frappe.desk.reportview import get_filters_cond, get_match_cond
+from frappe.desk.reportview import get_match_cond
 
 
-def on_submit(self,method):
-    if self.custom_advance_payment_receipt:
-        frappe.db.set_value("Aetas Advance Payment Receipt",self.custom_advance_payment_receipt,"status","Received")
-        frappe.db.set_value("Aetas Advance Payment Receipt",self.custom_advance_payment_receipt,"payment_entry",self.name)
+def _set_receipt_status(receipt_name, status, payment_entry=None):
+    if not receipt_name:
+        return
+
+    if not frappe.db.exists("Aetas Advance Payment Receipt", receipt_name):
+        return
+
+    values = {"status": status}
+    if payment_entry is not None:
+        values["payment_entry"] = payment_entry
+
+    frappe.db.set_value("Aetas Advance Payment Receipt", receipt_name, values)
+
+
+def on_submit(self, method=None):
+    _set_receipt_status(self.custom_advance_payment_receipt, "Received", self.name)
+
+
+def on_cancel(self, method=None):
+    _set_receipt_status(self.custom_advance_payment_receipt, "To Be Received", "")
+
 
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
 def custom_query(doctype, txt, searchfield, start, page_len, filters):
+    customer = (filters or {}).get("customer")
+    if not customer:
+        return []
+
     return frappe.db.sql("""
         SELECT name
         FROM `tabAetas Advance Payment Receipt`
@@ -19,5 +39,5 @@ def custom_query(doctype, txt, searchfield, start, page_len, filters):
     """.format(
         mcond=get_match_cond(doctype)
     ), {
-        "customer": filters.get("customer"),
+        "customer": customer,
     })
