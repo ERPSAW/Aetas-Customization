@@ -539,15 +539,42 @@ def generate_payment_link_for_invoice(si_name, amount):
 	)
 	customer_email = getattr(si, "contact_email", "") or ""
 
-	link = settings_doc.create_payment_link(
-		amount_inr=amount,
-		currency=si.currency or "INR",
-		customer_name=customer_name,
-		customer_contact="",
-		customer_email=customer_email,
-		description="Payment for Invoice " + si_name,
+	request_payload = {
+		"amount_inr": amount,
+		"currency": si.currency or "INR",
+		"customer_name": customer_name,
+		"customer_contact": "",
+		"customer_email": customer_email,
+		"description": "Payment for Invoice " + si_name,
+		"reference_doctype": "Sales Invoice",
+		"reference_docname": si_name,
+	}
+
+	activity_log = create_activity_log(
+		direction="Outbound",
+		activity_type="payment_link.create",
+		processing_status="Received",
 		reference_doctype="Sales Invoice",
 		reference_docname=si_name,
+		amount=amount,
+		request_payload=request_payload,
+	)
+
+	try:
+		link = settings_doc.create_payment_link(**request_payload)
+	except Exception as e:
+		update_activity_log(
+			activity_log,
+			processing_status="Failed",
+			error_message=str(e),
+		)
+		raise
+
+	update_activity_log(
+		activity_log,
+		processing_status="Processed",
+		response_payload=link,
+		link_id=link.get("id"),
 	)
 
 	expire_by_dt = None
@@ -634,35 +661,7 @@ def get_advances_received_for_si(si_name):
 		SELECT
 			apd.name as child_name,
 			apd.parent as apr_name,
-        request_payload = {
-            "amount_inr": amount,
-            "currency": si.currency or "INR",
-            "customer_name": customer_name,
-            "customer_contact": "",
-            "customer_email": customer_email,
-            "description": "Payment for Invoice " + si_name,
-            "reference_doctype": "Sales Invoice",
-            "reference_docname": si_name,
-        }
-        activity_log = create_activity_log(
-            direction="Outbound",
-            activity_type="payment_link.create",
-            processing_status="Received",
-            reference_doctype="Sales Invoice",
-            reference_docname=si_name,
-            amount=amount,
-            request_payload=request_payload,
-        )
 			apd.payment_entry,
-        try:
-            link = settings_doc.create_payment_link(**request_payload)
-        except Exception as e:
-            update_activity_log(
-                activity_log,
-                processing_status="Failed",
-                error_message=str(e),
-            )
-            raise
 			apd.amount,
 			apd.sales_invoice
 		FROM `tabAetas APR Payment Detail` apd
@@ -681,12 +680,6 @@ def apply_advance_adjustment(si_name, adjustment_amount):
 	"""
 	Apply advance adjustment to a Sales Invoice.
 	This is called when the user confirms the advance adjustment prompt.
-        update_activity_log(
-            activity_log,
-            processing_status="Processed",
-            response_payload=link,
-            link_id=link.get("id"),
-        )
 	
 	In real implementation, should create a Journal Entry or use ERPNext's native advance allocation.
 	For now, a stub that logs the adjustment.
