@@ -205,8 +205,17 @@ def link_payment_to_si(apr_name, child_row_name, si_name):
 	
 	# Fetch the SI and validate customer match
 	si = frappe.get_doc("Sales Invoice", si_name)
+	if si.docstatus != 0:
+		frappe.throw(_("Sales Invoice must be in Draft status to link an advance payment."))
+
 	if si.customer != apr.customer:
 		frappe.throw(_("Sales Invoice customer {0} does not match APR customer {1}").format(si.customer, apr.customer))
+
+	if any(
+		row.reference_type == "Payment Entry" and row.reference_name == child_row.payment_entry
+		for row in (si.advances or [])
+	):
+		frappe.throw(_("Payment Entry {0} is already present in Sales Invoice advances.").format(child_row.payment_entry))
 	
 	# Update the child row's SI field
 	child_row.sales_invoice = si_name
@@ -214,8 +223,8 @@ def link_payment_to_si(apr_name, child_row_name, si_name):
 	
 	# Add an entry to the SI Advance child table
 	si.append("advances", {
-		"reference_type": "Aetas Advance Payment Receipt",
-		"reference_name": apr_name,
+		"reference_type": "Payment Entry",
+		"reference_name": child_row.payment_entry,
 		"advance_amount": child_row.amount,
 		"allocated_amount": 0,
 	})

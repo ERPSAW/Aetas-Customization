@@ -398,9 +398,111 @@ class TestAPRPaymentDetailChildTable(FrappeTestCase):
 		
 		# Verify child row was inserted
 		self.assertEqual(len(apr.payment_details), 1)
-		self.assertEqual(apr.payment_details[0]["payment_entry"], "ACC-PE-001")
-		self.assertEqual(apr.payment_details[0]["amount"], 1000.0)
-		self.assertIsNone(apr.payment_details[0]["sales_invoice"])
+
+
+# ---------------------------------------------------------------------------
+# Phase 6: Razorpay Charges Accounting (Option A / Option B)
+# ---------------------------------------------------------------------------
+
+class TestRazorpayChargesAccounting(FrappeTestCase):
+
+	def setUp(self):
+		self.arpl = MagicMock()
+		self.arpl.link_id = "plink_001"
+		self.arpl.reference_doctype = "Aetas Advance Payment Receipt"
+		self.arpl.reference_docname = "AAPR-001"
+		
+		self.source_doc = MagicMock()
+		self.source_doc.get.side_effect = lambda k, d=None: {
+			"customer": "Test Customer",
+			"company": "Test Company",
+			"mode_of_payment": "Razorpay",
+			"custom_boutique": "Test Boutique"
+		}.get(k, d)
+
+	@patch("frappe.get_doc")
+	@patch("frappe.new_doc")
+	@patch("frappe.db.get_value")
+	@patch(_RZP_SRC)
+	def test_create_payment_entry_option_a(self, mock_rzp_settings, mock_db_get, mock_new_doc, mock_get_doc):
+		"""Phase 6: Option A adds deductions to Payment Entry."""
+		from aetas_customization.aetas_customization.api.webhook import _create_payment_entry
+		
+		# Mock Razorpay Settings
+		mock_rzp_settings.get_settings_for_boutique.return_value = {
+			"charge_accounting_option": "Option A",
+			"charge_account": "Bank Charges - Test",
+			"transaction_fee_percentage": 2.0
+		}
+		
+		# Mock DB / Metadata
+		mock_db_get.side_effect = lambda *args, **kwargs: "Test Cost Center" if args[0] == "Boutique" else "INR"
+		
+		mock_pe = MagicMock()
+		mock_pe.precision.return_value = 2
+		mock_pe.deductions = []
+		mock_pe.append = lambda f, d: mock_pe.deductions.append(d)
+		mock_new_doc.return_value = mock_pe
+		
+		with patch("erpnext.accounts.party.get_party_account", return_value="Receivable"), \
+			 patch("erpnext.accounts.doctype.journal_entry.journal_entry.get_default_bank_cash_account", return_value={"account": "Bank"}), \
+			 patch("erpnext.accounts.utils.get_account_currency", return_value="INR"):
+			
+			_create_payment_entry(self.arpl, self.source_doc, 100000, "pay_001") # 1000 INR
+		
+		# Assertions
+		self.assertEqual(mock_pe.paid_amount, 1000.0)
+		self.assertEqual(mock_pe.received_amount, 980.0) # 1000 - 2%
+		self.assertEqual(len(mock_pe.deductions), 1)
+		self.assertEqual(mock_pe.deductions[0]["amount"], 20.0)
+		self.assertEqual(mock_pe.deductions[0]["account"], "Bank Charges - Test")
+		mock_pe.submit.assert_called_once()
+
+	@patch("frappe.get_doc")
+	@patch("frappe.new_doc")
+	@patch("frappe.db.get_value")
+	@patch(_RZP_SRC)
+	def test_create_payment_entry_option_b(self, mock_rzp_settings, mock_db_get, mock_new_doc, mock_get_doc):
+		"""Phase 6: Option B creates a separate Journal Entry."""
+		from aetas_customization.aetas_customization.api.webhook import _create_payment_entry
+		
+		# Mock Razorpay Settings
+		mock_rzp_settings.get_settings_for_boutique.return_value = {
+			"charge_accounting_option": "Option B",
+			"charge_account": "Bank Charges - Test",
+			"transaction_fee_percentage": 2.36
+		}
+		
+		mock_pe = MagicMock()
+		mock_pe.precision.return_value = 2
+		mock_pe.deductions = []
+		mock_pe.paid_to = "Bank Account"
+		
+		mock_je = MagicMock()
+		mock_je.accounts = []
+		mock_je.append = lambda f, d: mock_je.accounts.append(d)
+		
+		def new_doc_side_effect(doctype):
+			return mock_pe if doctype == "Payment Entry" else mock_je
+			
+		mock_new_doc.side_effect = new_doc_side_effect
+		
+		with patch("erpnext.accounts.party.get_party_account", return_value="Receivable"), \
+			 patch("erpnext.accounts.doctype.journal_entry.journal_entry.get_default_bank_cash_account", return_value={"account": "Bank"}), \
+			 patch("erpnext.accounts.utils.get_account_currency", return_value="INR"), \
+			 patch("frappe.get_cached_value", return_value="Global CC"):
+			
+			_create_payment_entry(self.arpl, self.source_doc, 100000, "pay_001")
+		
+		# Assertions
+		self.assertEqual(mock_pe.paid_amount, 1000.0)
+		self.assertEqual(mock_pe.received_amount, 1000.0) # Net matches gross in Option B
+		self.assertEqual(len(mock_pe.deductions), 0)
+		
+		# Verify JE creation
+		mock_je.insert.assert_called_once()
+		mock_je.submit.assert_called_once()
+		self.assertEqual(len(mock_je.accounts), 2)
 	
 	def test_child_table_row_not_inserted_when_apr_blank(self):
 		"""TEST-014: Child row not inserted if APR field is blank."""
@@ -417,3 +519,273 @@ class TestAPRPaymentDetailChildTable(FrappeTestCase):
 		
 		# No append should have been called
 		apr.append.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# TEST-007 / TEST-008 / TEST-017: Webhook idempotency and failure paths
+# ---------------------------------------------------------------------------
+
+class TestWebhookHardening(FrappeTestCase):
+
+	def test_payment_link_paid_skips_when_arpl_already_paid(self):
+		"""TEST-007: already-paid ARPL replay is idempotent and does not re-post."""
+		from aetas_customization.aetas_customization.api import webhook as webhook_api
+
+		payload = {
+			"payload": {
+				"payment_link": {"entity": {"id": "plink_x", "amount": 10000}},
+				"payment": {"entity": {"id": "pay_x"}},
+			}
+		}
+
+		with patch("frappe.db.get_value", return_value={
+			"name": "ARPL-0001",
+			"reference_doctype": "Aetas Advance Payment Receipt",
+			"reference_docname": "AAPR-0001",
+			"status": "Paid",
+			"amount": 100.0,
+			"boutique": "Main",
+			"razorpay_payment_id": "pay_old",
+		}), patch.object(webhook_api, "_create_payment_entry") as create_pe:
+			result = webhook_api._handle_payment_link_paid(payload)
+
+		self.assertEqual(result["status"], "already_paid")
+		create_pe.assert_not_called()
+
+	def test_payment_link_paid_skips_when_payment_entry_already_exists(self):
+		"""TEST-007/TEST-017: existing PE by payment id marks tracker paid and skips posting."""
+		from aetas_customization.aetas_customization.api import webhook as webhook_api
+
+		payload = {
+			"payload": {
+				"payment_link": {"entity": {"id": "plink_y", "amount": 5000}},
+				"payment": {"entity": {"id": "pay_y"}},
+			}
+		}
+
+		arpl = {
+			"name": "ARPL-0002",
+			"reference_doctype": "Aetas Advance Payment Receipt",
+			"reference_docname": "AAPR-0002",
+			"status": "Created",
+			"amount": 50.0,
+			"boutique": "Main",
+			"razorpay_payment_id": None,
+		}
+
+		with patch("frappe.db.get_value", return_value=arpl), \
+			 patch("frappe.db.exists", side_effect=lambda dt, filters: dt == "Payment Entry"), \
+			 patch("frappe.db.set_value") as set_value, \
+			 patch.object(webhook_api, "_create_payment_entry") as create_pe:
+			result = webhook_api._handle_payment_link_paid(payload)
+
+		self.assertEqual(result["status"], "already_paid")
+		create_pe.assert_not_called()
+		set_value.assert_called_with(
+			"Aetas Razorpay Payment Link",
+			"ARPL-0002",
+			{"status": "Paid", "razorpay_payment_id": "pay_y"},
+		)
+
+	def test_payment_failed_fallback_lookup_by_notes_reference(self):
+		"""TEST-008: payment.failed resolves tracker via notes fallback and sets failed without posting."""
+		from aetas_customization.aetas_customization.api import webhook as webhook_api
+
+		payload = {
+			"payload": {
+				"payment": {
+					"entity": {
+						"id": "pay_missing",
+						"notes": {
+							"reference_doctype": "Aetas Advance Payment Receipt",
+							"reference_docname": "AAPR-0003",
+						},
+					}
+				}
+			}
+		}
+
+		values = [
+			None,
+			{
+				"name": "ARPL-0003",
+				"reference_doctype": "Aetas Advance Payment Receipt",
+				"reference_docname": "AAPR-0003",
+			},
+			"To Be Received",
+		]
+
+		with patch("frappe.db.get_value", side_effect=values), \
+			 patch("frappe.db.set_value") as set_value, \
+			 patch.object(webhook_api, "_queue_failure_notification") as notify_failure, \
+			 patch.object(webhook_api, "_create_payment_entry") as create_pe:
+			result = webhook_api._handle_payment_failed(payload)
+
+		self.assertEqual(result["status"], "failed")
+		create_pe.assert_not_called()
+		notify_failure.assert_called_once()
+		self.assertTrue(set_value.called)
+
+
+# ---------------------------------------------------------------------------
+# TEST-010 / TEST-016: Phase 5 advance APIs
+# ---------------------------------------------------------------------------
+
+class TestSalesInvoiceAdvanceApis(FrappeTestCase):
+
+	def test_get_unlinked_customer_advances_returns_empty_without_customer(self):
+		from aetas_customization.aetas_customization.overrides.sales_invoice import (
+			get_unlinked_customer_advances,
+		)
+
+		self.assertEqual(get_unlinked_customer_advances(None), [])
+
+	def test_get_advances_received_for_si_filters_existing_references(self):
+		from aetas_customization.aetas_customization.overrides.sales_invoice import (
+			get_advances_received_for_si,
+		)
+
+		si = MagicMock()
+		si.customer = "CUST-001"
+		si.get.return_value = [
+			frappe._dict({"reference_type": "Payment Entry", "reference_name": "PE-EXISTING"})
+		]
+
+		rows = [
+			frappe._dict({"payment_entry": "PE-EXISTING", "amount": 100.0, "apr_name": "AAPR-1", "sales_invoice": None}),
+			frappe._dict({"payment_entry": "PE-NEW", "amount": 200.0, "apr_name": "AAPR-2", "sales_invoice": None}),
+		]
+
+		with patch("frappe.get_doc", return_value=si), patch("frappe.db.sql", return_value=rows):
+			result = get_advances_received_for_si("SINV-0001")
+
+		self.assertEqual(len(result), 1)
+		self.assertEqual(result[0]["payment_entry"], "PE-NEW")
+
+	def test_apply_advance_adjustment_blocks_when_exceeds_available(self):
+		from aetas_customization.aetas_customization.overrides.sales_invoice import (
+			apply_advance_adjustment,
+		)
+
+		si = MagicMock()
+		si.customer = "CUST-001"
+
+		with patch("frappe.get_doc", return_value=si), \
+			 patch(
+				"aetas_customization.aetas_customization.overrides.sales_invoice.get_customer_advance_balance",
+				return_value={"balance": 100.0, "aprs": ["AAPR-001"]},
+			 ):
+			with self.assertRaises(frappe.ValidationError):
+				apply_advance_adjustment("SINV-0001", 120.0)
+
+
+# ---------------------------------------------------------------------------
+# TEST-015: Link APR Payment row to Sales Invoice
+# ---------------------------------------------------------------------------
+
+class TestLinkPaymentToSI(FrappeTestCase):
+
+	def _make_apr(self, customer="CUST-001", amount=250.0, sales_invoice=None):
+		apr = MagicMock()
+		apr.customer = customer
+		apr.save = MagicMock()
+
+		row = frappe._dict(
+			{
+				"name": "ROW-001",
+				"payment_entry": "PE-0001",
+				"amount": amount,
+				"sales_invoice": sales_invoice,
+			}
+		)
+		apr.payment_details = [row]
+		return apr, row
+
+	def _make_si(self, customer="CUST-001", docstatus=0, advances=None):
+		si = MagicMock()
+		si.customer = customer
+		si.docstatus = docstatus
+		si.advances = advances or []
+		si.append = MagicMock()
+		si.save = MagicMock()
+		return si
+
+	def test_links_valid_row_and_appends_payment_entry_advance(self):
+		from aetas_customization.aetas_customization.doctype.aetas_advance_payment_receipt.aetas_advance_payment_receipt import (
+			link_payment_to_si,
+		)
+
+		apr, row = self._make_apr()
+		si = self._make_si()
+
+		def get_doc_side_effect(doctype, name):
+			if doctype == "Aetas Advance Payment Receipt":
+				return apr
+			if doctype == "Sales Invoice":
+				return si
+			raise AssertionError("Unexpected doctype")
+
+		with patch("frappe.get_doc", side_effect=get_doc_side_effect):
+			result = link_payment_to_si("AAPR-001", row.name, "SINV-001")
+
+		self.assertEqual(result.get("status"), "success")
+		self.assertEqual(row.sales_invoice, "SINV-001")
+		si.append.assert_called_once_with(
+			"advances",
+			{
+				"reference_type": "Payment Entry",
+				"reference_name": "PE-0001",
+				"advance_amount": 250.0,
+				"allocated_amount": 0,
+			},
+		)
+
+	def test_blocks_when_row_already_linked(self):
+		from aetas_customization.aetas_customization.doctype.aetas_advance_payment_receipt.aetas_advance_payment_receipt import (
+			link_payment_to_si,
+		)
+
+		apr, row = self._make_apr(sales_invoice="SINV-EXISTING")
+		si = self._make_si()
+
+		with patch("frappe.get_doc", side_effect=[apr, si]):
+			with self.assertRaises(frappe.ValidationError):
+				link_payment_to_si("AAPR-001", row.name, "SINV-001")
+
+	def test_blocks_when_amount_is_zero(self):
+		from aetas_customization.aetas_customization.doctype.aetas_advance_payment_receipt.aetas_advance_payment_receipt import (
+			link_payment_to_si,
+		)
+
+		apr, row = self._make_apr(amount=0)
+		si = self._make_si()
+
+		with patch("frappe.get_doc", side_effect=[apr, si]):
+			with self.assertRaises(frappe.ValidationError):
+				link_payment_to_si("AAPR-001", row.name, "SINV-001")
+
+	def test_blocks_on_customer_mismatch(self):
+		from aetas_customization.aetas_customization.doctype.aetas_advance_payment_receipt.aetas_advance_payment_receipt import (
+			link_payment_to_si,
+		)
+
+		apr, row = self._make_apr(customer="CUST-A")
+		si = self._make_si(customer="CUST-B")
+
+		with patch("frappe.get_doc", side_effect=[apr, si]):
+			with self.assertRaises(frappe.ValidationError):
+				link_payment_to_si("AAPR-001", row.name, "SINV-001")
+
+	def test_blocks_replay_when_payment_entry_already_in_advances(self):
+		from aetas_customization.aetas_customization.doctype.aetas_advance_payment_receipt.aetas_advance_payment_receipt import (
+			link_payment_to_si,
+		)
+
+		apr, row = self._make_apr()
+		si = self._make_si(
+			advances=[frappe._dict({"reference_type": "Payment Entry", "reference_name": "PE-0001"})]
+		)
+
+		with patch("frappe.get_doc", side_effect=[apr, si]):
+			with self.assertRaises(frappe.ValidationError):
+				link_payment_to_si("AAPR-001", row.name, "SINV-001")

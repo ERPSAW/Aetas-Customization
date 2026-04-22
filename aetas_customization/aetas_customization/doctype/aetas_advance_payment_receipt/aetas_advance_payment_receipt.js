@@ -62,7 +62,7 @@ frappe.ui.form.on('Aetas Advance Payment Receipt', {
 			frm.add_custom_button(__("Link Payment to SI"), function() {
 				// Build list of unlinked payment rows
 				const payment_options = unlinked_rows
-					.map(row => `${row.payment_entry} (${format_currency(row.amount, "INR")})`)
+					.map(row => `${row.name} | ${row.payment_entry} (${format_currency(row.amount, "INR")})`)
 					.join("\n");
 				
 				frappe.prompt(
@@ -81,15 +81,15 @@ frappe.ui.form.on('Aetas Advance Payment Receipt', {
 							options: "Sales Invoice",
 							filters: {
 								"customer": frm.doc.customer,
-								"docstatus": 1,
+								"docstatus": 0,
 							},
 							reqd: 1,
 						}
 					],
 					function(values) {
 						// Find the selected row name
-						const selected_payment = values.payment_row.split(" ")[0];  // Extract PE name
-						const selected_row = unlinked_rows.find(row => row.payment_entry === selected_payment);
+						const selected_row_name = (values.payment_row || "").split("|")[0].trim();
+						const selected_row = unlinked_rows.find(row => row.name === selected_row_name);
 						
 						if (!selected_row) {
 							frappe.msgprint(__("Payment row not found"));

@@ -5,7 +5,7 @@ import hashlib
 import hmac
 import json
 import frappe
-from frappe.utils import now_datetime
+from frappe.utils import flt, now_datetime
 from frappe import _
 
 from aetas_customization.aetas_customization.api.razorpay_activity_log import (
@@ -36,6 +36,30 @@ def handle_razorpay_webhook():
 		payload = json.loads(body) if body else {}
 		event = payload.get("event") or "unknown"
 
+		# Resolve Boutique from payload to get the correct secret
+		boutique_name = _get_boutique_from_payload(payload)
+		razorpay_settings = None
+		webhook_secret = None
+		
+		if boutique_name:
+			from payments.payment_gateways.doctype.razorpay_settings.razorpay_settings import RazorpaySettings
+			try:
+				settings_doc = RazorpaySettings.get_settings_for_boutique(boutique_name)
+				# get_settings_for_boutique returns a dict with api_key, api_secret. 
+				# We need the webhook_secret from the actual document.
+				webhook_secret = frappe.db.get_value("Razorpay Settings", boutique_name, "webhook_secret")
+			except Exception:
+				pass
+
+		signature = headers.get("X-Razorpay-Signature")
+		is_signature_valid = False
+		if signature and webhook_secret:
+			try:
+				_validate_webhook_signature(body, signature, webhook_secret)
+				is_signature_valid = True
+			except Exception:
+				is_signature_valid = False
+
 		activity_log = create_activity_log(
 			direction="Inbound",
 			activity_type=event,
@@ -44,7 +68,16 @@ def handle_razorpay_webhook():
 			payload_hash=payload_hash,
 			source_ip=source_ip,
 			request_payload=payload,
+			signature_valid=is_signature_valid,
 		)
+
+		if not is_signature_valid and webhook_secret:
+			update_activity_log(
+				activity_log,
+				processing_status="Failed",
+				error_message="Invalid Webhook Signature",
+			)
+			return {"status": "error", "message": "Invalid Signature"}, 401
 
 		dedup_log = get_duplicate_inbound_log(
 			event_id=event_id,
@@ -142,20 +175,51 @@ def _handle_payment_link_paid(payload):
 		arpl = frappe.db.get_value(
 			"Aetas Razorpay Payment Link",
 			{"link_id": razorpay_link_id},
-			["name", "reference_doctype", "reference_docname", "status", "amount", "boutique"],
+			[
+				"name",
+				"reference_doctype",
+				"reference_docname",
+				"status",
+				"amount",
+				"boutique",
+				"razorpay_payment_id",
+			],
 			as_dict=True
 		)
+		arpl = frappe._dict(arpl or {})
 		
-		if not arpl:
+		if not arpl.get("name"):
 			frappe.logger().warning(f"Razorpay webhook: No ARPL found for link_id {razorpay_link_id}")
 			frappe.throw(_("No payment link record found for link ID {0}").format(razorpay_link_id))
 		
 		# Idempotency guard — if already paid, skip
-		if arpl.status == "Paid":
+		if arpl.get("status") == "Paid":
 			frappe.logger().info(f"Razorpay webhook: ARPL {arpl.name} already paid, skipping")
 			return {
 				"status": "already_paid",
 				"link_id": razorpay_link_id,
+				"payment_id": arpl.razorpay_payment_id,
+				"reference_doctype": arpl.reference_doctype,
+				"reference_docname": arpl.reference_docname,
+			}
+
+		# Business-level idempotency guard: this payment id is already posted.
+		if razorpay_payment_id and frappe.db.exists(
+			"Payment Entry",
+			{"reference_no": razorpay_payment_id, "docstatus": 1},
+		):
+			frappe.logger().info(
+				f"Razorpay webhook: Payment Entry already exists for payment_id {razorpay_payment_id}, skipping"
+			)
+			frappe.db.set_value(
+				"Aetas Razorpay Payment Link",
+				arpl.name,
+				{"status": "Paid", "razorpay_payment_id": razorpay_payment_id},
+			)
+			return {
+				"status": "already_paid",
+				"link_id": razorpay_link_id,
+				"payment_id": razorpay_payment_id,
 				"reference_doctype": arpl.reference_doctype,
 				"reference_docname": arpl.reference_docname,
 			}
@@ -163,9 +227,10 @@ def _handle_payment_link_paid(payload):
 		# Create Payment Entry
 		source_doctype = arpl.reference_doctype
 		source_docname = arpl.reference_docname
+		source_doc = frappe.get_doc(source_doctype, source_docname)
 		
 		resolved_amount = amount or int((arpl.amount or 0) * 100)
-		pe = _create_payment_entry(arpl, resolved_amount, razorpay_payment_id)
+		pe = _create_payment_entry(arpl, source_doc, resolved_amount, razorpay_payment_id)
 		frappe.logger().info(f"Razorpay webhook: Created Payment Entry {pe.name} for {source_doctype} {source_docname}")
 		
 		# Update ARPL status
@@ -180,13 +245,20 @@ def _handle_payment_link_paid(payload):
 		
 		# Insert APR Payment Detail child row (only if source is APR)
 		if source_doctype == "Aetas Advance Payment Receipt":
+			# Payment Entry submit hooks may already have updated the APR. Reload to avoid
+			# saving a stale document copy and triggering TimestampMismatchError.
 			source_doc = frappe.get_doc(source_doctype, source_docname)
-			source_doc.append("payment_details", {
-				"payment_entry": pe.name,
-				"amount": resolved_amount / 100.0,  # Razorpay returns amount in paise
-				"sales_invoice": None
-			})
-			source_doc.save(ignore_permissions=True)
+
+			# Payment Entry on_submit hook normally appends this row. Keep a fallback append
+			# in case hook execution is bypassed for any reason.
+			existing_row = any((row.payment_entry == pe.name) for row in (source_doc.payment_details or []))
+			if not existing_row:
+				source_doc.append("payment_details", {
+					"payment_entry": pe.name,
+					"amount": resolved_amount / 100.0,
+					"sales_invoice": None,
+				})
+				source_doc.save(ignore_permissions=True)
 			
 			# Update source document status
 			_update_source_status(source_doc)
@@ -223,12 +295,29 @@ def _handle_payment_link_cancelled(payload):
 		arpl = frappe.db.get_value(
 			"Aetas Razorpay Payment Link",
 			{"link_id": razorpay_link_id},
-			["name", "reference_doctype", "reference_docname"],
+			["name", "reference_doctype", "reference_docname", "status"],
 			as_dict=True
 		)
+		arpl = frappe._dict(arpl or {})
 		
-		if not arpl:
+		if not arpl.get("name"):
 			return {"status": "missing_tracker", "link_id": razorpay_link_id}
+
+		if arpl.get("status") == "Paid":
+			return {
+				"status": "already_paid",
+				"link_id": razorpay_link_id,
+				"reference_doctype": arpl.reference_doctype,
+				"reference_docname": arpl.reference_docname,
+			}
+
+		if arpl.get("status") == "Cancelled":
+			return {
+				"status": "cancelled",
+				"link_id": razorpay_link_id,
+				"reference_doctype": arpl.reference_doctype,
+				"reference_docname": arpl.reference_docname,
+			}
 		
 		# Update ARPL status
 		frappe.db.set_value(
@@ -240,6 +329,18 @@ def _handle_payment_link_cancelled(payload):
 		
 		# Update source document status to Failed (if APR)
 		if arpl.reference_doctype == "Aetas Advance Payment Receipt":
+			current_status = frappe.db.get_value(
+				arpl.reference_doctype,
+				arpl.reference_docname,
+				"status",
+			)
+			if current_status == "Paid":
+				return {
+					"status": "already_paid",
+					"reference_doctype": arpl.reference_doctype,
+					"reference_docname": arpl.reference_docname,
+				}
+
 			frappe.db.set_value(
 				arpl.reference_doctype,
 				arpl.reference_docname,
@@ -267,8 +368,9 @@ def _handle_payment_failed(payload):
 	try:
 		payment_data = payload.get("payload", {}).get("payment", {}).get("entity", {})
 		razorpay_payment_id = payment_data.get("id")
+		payment_notes = payment_data.get("notes") or {}
 		
-		if not razorpay_payment_id:
+		if not razorpay_payment_id and not payment_notes:
 			frappe.logger().error("Razorpay webhook: Missing payment.id in failed event")
 			return {"status": "ignored"}
 		
@@ -276,14 +378,47 @@ def _handle_payment_failed(payload):
 		arpl = frappe.db.get_value(
 			"Aetas Razorpay Payment Link",
 			{"razorpay_payment_id": razorpay_payment_id},
-			["name", "reference_doctype", "reference_docname"],
+			["name", "reference_doctype", "reference_docname", "status"],
 			as_dict=True
 		)
+		arpl = frappe._dict(arpl or {})
+
+		if not arpl.get("name"):
+			fallback_reference_doctype = payment_notes.get("reference_doctype")
+			fallback_reference_docname = payment_notes.get("reference_docname")
+			if fallback_reference_doctype and fallback_reference_docname:
+				arpl = frappe.db.get_value(
+					"Aetas Razorpay Payment Link",
+					{
+						"reference_doctype": fallback_reference_doctype,
+						"reference_docname": fallback_reference_docname,
+						"status": ["in", ["Created", "Failed", "Cancelled"]],
+					},
+					["name", "reference_doctype", "reference_docname", "status"],
+					as_dict=True,
+				)
+				arpl = frappe._dict(arpl or {})
 		
-		if not arpl:
+		if not arpl.get("name"):
 			# Payment failed before link capture — nothing to update
 			frappe.logger().warning(f"Razorpay webhook: No ARPL found for payment {razorpay_payment_id}")
 			return {"status": "missing_tracker", "payment_id": razorpay_payment_id}
+
+		if arpl.get("status") == "Paid":
+			return {
+				"status": "already_paid",
+				"payment_id": razorpay_payment_id,
+				"reference_doctype": arpl.reference_doctype,
+				"reference_docname": arpl.reference_docname,
+			}
+
+		if arpl.get("status") == "Failed":
+			return {
+				"status": "failed",
+				"payment_id": razorpay_payment_id,
+				"reference_doctype": arpl.reference_doctype,
+				"reference_docname": arpl.reference_docname,
+			}
 		
 		# Update ARPL
 		frappe.db.set_value(
@@ -315,32 +450,153 @@ def _handle_payment_failed(payload):
 		raise
 
 
-def _create_payment_entry(arpl, amount, razorpay_payment_id):
+def _create_payment_entry(arpl, source_doc, amount, razorpay_payment_id):
 	"""
 	Create a Payment Entry for the successful payment.
 	
-	For now, a minimal stub. In production, this should:
-	- Resolve GL accounts from boutique configuration.
-	- Handle charge accounting (Option A or Option B).
-	- Link back to the source document (APR or SI).
+	Handles charge accounting (Option A or Option B) based on boutique settings.
 	"""
-	amount_in_inr = amount / 100.0  # Razorpay returns amount in paise
+	from erpnext.accounts.doctype.journal_entry.journal_entry import get_default_bank_cash_account
+	from erpnext.accounts.party import get_party_account
+	from erpnext.accounts.utils import get_account_currency
+	from payments.payment_gateways.doctype.razorpay_settings.razorpay_settings import RazorpaySettings
+
+	amount_in_inr = flt(amount) / 100.0  # Razorpay returns amount in paise
+	customer = source_doc.get("customer")
+	if not customer:
+		frappe.throw(
+			_("Customer is required on {0} {1} for Payment Entry creation.").format(
+				arpl.reference_doctype,
+				arpl.reference_docname,
+			)
+		)
+
+	company = (
+		source_doc.get("company")
+		or frappe.defaults.get_user_default("Company")
+		or frappe.defaults.get_global_default("company")
+	)
+	if not company:
+		frappe.throw(_("Default company is not configured for webhook payment posting."))
+
+	party_account = get_party_account("Customer", customer, company)
+	if not party_account:
+		frappe.throw(
+			_("Could not resolve receivable account for customer {0} in company {1}.").format(
+				customer,
+				company,
+			)
+		)
+
+	bank = get_default_bank_cash_account(
+		company,
+		"Bank",
+		mode_of_payment=source_doc.get("mode_of_payment"),
+	) or get_default_bank_cash_account(
+		company,
+		"Cash",
+		mode_of_payment=source_doc.get("mode_of_payment"),
+	)
+	if not bank or not bank.get("account"):
+		frappe.throw(
+			_("Could not resolve default Bank/Cash account for company {0}.").format(company)
+		)
+
+	# Fetch boutique settings for charge accounting
+	boutique = source_doc.get("custom_boutique")
+	razorpay_settings = RazorpaySettings.get_settings_for_boutique(boutique)
 	
-	# Placeholder: minimal PE structure
+	total_fee = 0.0
+	charge_account = razorpay_settings.get("charge_account")
+	accounting_option = razorpay_settings.get("charge_accounting_option")
+	fee_percentage = flt(razorpay_settings.get("transaction_fee_percentage")) or 2.36
+
+	if charge_account:
+		total_fee = flt(amount_in_inr * (fee_percentage / 100.0), pe.precision("paid_amount") if "pe" in locals() else 2)
+
+	posting_date = source_doc.get("date") or now_datetime().date()
+
 	pe = frappe.new_doc("Payment Entry")
+	pe.company = company
+	pe.posting_date = posting_date
 	pe.payment_type = "Receive"
 	pe.party_type = "Customer"
+	pe.party = customer
+	pe.mode_of_payment = source_doc.get("mode_of_payment")
+	pe.paid_from = party_account
+	pe.paid_to = bank.get("account")
+	pe.paid_from_account_currency = get_account_currency(party_account)
+	pe.paid_to_account_currency = get_account_currency(bank.get("account"))
+	pe.paid_amount = amount_in_inr
+	pe.received_amount = amount_in_inr
+	
+	# Option A: Deduction in Payment Entry
+	if accounting_option == "Option A" and total_fee > 0 and charge_account:
+		pe.received_amount = flt(amount_in_inr - total_fee, pe.precision("received_amount"))
+		
+		# Resolve Cost Center from Boutique
+		cost_center = None
+		if boutique:
+			cost_center = frappe.db.get_value("Boutique", boutique, "boutique_cost_center")
+		
+		if not cost_center:
+			cost_center = frappe.get_cached_value("Company", company, "cost_center")
+
+		pe.append("deductions", {
+			"account": charge_account,
+			"cost_center": cost_center,
+			"amount": total_fee
+		})
+
 	pe.reference_no = razorpay_payment_id
 	pe.reference_date = now_datetime().date()
 	pe.remarks = f"Razorpay Payment Link: {arpl.link_id}"
 	
-	# This is a stub — real implementation needs boutique GL configurations
+	# Keep APR backlink for later traceability and APR status synchronization hooks.
 	pe.custom_advance_payment_receipt = arpl.reference_docname if arpl.reference_doctype == "Aetas Advance Payment Receipt" else None
 	
 	pe.insert(ignore_permissions=True)
 	pe.submit()
+
+	# Option B: Separate Journal Entry (Post-Submit)
+	if accounting_option == "Option B" and total_fee > 0 and charge_account:
+		_create_fee_journal_entry(pe, total_fee, charge_account, boutique)
 	
 	return pe
+
+
+def _create_fee_journal_entry(pe, total_fee, charge_account, boutique):
+	"""Creates a separate Journal Entry for Razorpay fees (Option B)."""
+	cost_center = None
+	if boutique:
+		cost_center = frappe.db.get_value("Boutique", boutique, "boutique_cost_center")
+	
+	if not cost_center:
+		cost_center = frappe.get_cached_value("Company", pe.company, "cost_center")
+
+	je = frappe.new_doc("Journal Entry")
+	je.company = pe.company
+	je.posting_date = pe.posting_date
+	je.voucher_type = "Journal Entry"
+	je.multi_currency = 1
+	
+	je.append("accounts", {
+		"account": charge_account,
+		"debit_in_account_currency": total_fee,
+		"cost_center": cost_center
+	})
+	
+	je.append("accounts", {
+		"account": pe.paid_to,
+		"credit_in_account_currency": total_fee,
+		"cost_center": cost_center
+	})
+
+	je.user_remark = f"Razorpay Transaction Fee for {pe.name} ({pe.reference_no})"
+	je.insert(ignore_permissions=True)
+	je.submit()
+	
+	return je
 
 
 def _update_source_status(source_doc):
@@ -395,3 +651,35 @@ def _queue_failure_notification(doctype, docname):
 			# In production: frappe.enqueue("aetas_customization...send_failure_email", queue='short', ...)
 	except Exception as e:
 		frappe.logger().warning(f"Could not queue failure notification: {str(e)}")
+
+
+def _get_boutique_from_payload(payload):
+	"""
+	Extract the boutique name from the Razorpay webhook payload notes.
+	"""
+	notes = {}
+	# Check order notes, payment_link notes, or payment notes
+	payload_data = payload.get("payload", {})
+	for entity_key in ["order", "payment_link", "payment"]:
+		entity_notes = payload_data.get(entity_key, {}).get("entity", {}).get("notes", {})
+		if entity_notes:
+			notes.update(entity_notes)
+	
+	ref_doctype = notes.get("reference_doctype")
+	ref_docname = notes.get("reference_docname")
+	
+	if ref_doctype and ref_docname:
+		# Cross-reference with ARPL to get the boutique
+		boutique = frappe.db.get_value(
+			"Aetas Razorpay Payment Link",
+			{"reference_doctype": ref_doctype, "reference_docname": ref_docname},
+			"boutique"
+		)
+		return boutique
+	
+	# Fallback: check link_id directly
+	link_id = payload_data.get("payment_link", {}).get("entity", {}).get("id")
+	if link_id:
+		return frappe.db.get_value("Aetas Razorpay Payment Link", {"link_id": link_id}, "boutique")
+		
+	return None

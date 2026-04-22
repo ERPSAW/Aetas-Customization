@@ -23,12 +23,14 @@ def on_submit(self, method=None):
     if self.custom_advance_payment_receipt:
         try:
             apr = frappe.get_doc("Aetas Advance Payment Receipt", self.custom_advance_payment_receipt)
-            apr.append("payment_details", {
-                "payment_entry": self.name,
-                "amount": self.paid_amount or 0,
-                "sales_invoice": None
-            })
-            apr.save(ignore_permissions=True)
+            existing_row = any((row.payment_entry == self.name) for row in (apr.payment_details or []))
+            if not existing_row:
+                apr.append("payment_details", {
+                    "payment_entry": self.name,
+                    "amount": self.paid_amount or 0,
+                    "sales_invoice": None
+                })
+                apr.save(ignore_permissions=True)
         except Exception as e:
             frappe.logger().warning(f"Could not insert APR Payment Detail row: {str(e)}")
 

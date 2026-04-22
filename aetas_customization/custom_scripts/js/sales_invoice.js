@@ -1,4 +1,49 @@
 const PRORATE_TO_LINES = true;
+
+function get_existing_advance_keys(frm) {
+	return new Set((frm.doc.advances || [])
+		.filter(row => row.reference_type && row.reference_name)
+		.map(row => `${row.reference_type}::${row.reference_name}`));
+}
+
+function apply_customer_advances_to_form(frm, rows, targetAmount) {
+	let remaining = frappe.utils.flt(targetAmount || 0);
+	if (remaining <= 0) {
+		return 0;
+	}
+
+	const existingKeys = get_existing_advance_keys(frm);
+	let applied = 0;
+
+	(rows || []).forEach(row => {
+		if (remaining <= 0) return;
+		const paymentEntry = row.payment_entry;
+		const amount = frappe.utils.flt(row.amount || 0);
+		if (!paymentEntry || amount <= 0) return;
+
+		const key = `Payment Entry::${paymentEntry}`;
+		if (existingKeys.has(key)) return;
+
+		const allocate = Math.min(amount, remaining);
+		frm.add_child("advances", {
+			reference_type: "Payment Entry",
+			reference_name: paymentEntry,
+			advance_amount: amount,
+			allocated_amount: allocate,
+		});
+
+		existingKeys.add(key);
+		applied += allocate;
+		remaining -= allocate;
+	});
+
+	if (applied > 0) {
+		frm.refresh_field("advances");
+	}
+
+	return applied;
+}
+
 frappe.ui.form.on('Sales Invoice', {
     refresh: function (frm) {
          frm.set_query('custom_aetas_coupon_code', function() {
@@ -36,8 +81,9 @@ frappe.ui.form.on('Sales Invoice', {
 
         });
 
-		// Phase 5 Sub-flow A: Advance adjustment prompt on SI creation
-		if (frm.is_new() && frm.doc.customer) {
+		// Phase 5 Sub-flow A: Advance adjustment prompt on SI creation.
+		if (frm.is_new() && frm.doc.customer && !frm.__advance_prompt_done) {
+			frm.__advance_prompt_done = true;
 			frappe.call({
 				method: "aetas_customization.aetas_customization.overrides.sales_invoice.get_customer_advance_balance",
 				args: {
@@ -45,7 +91,9 @@ frappe.ui.form.on('Sales Invoice', {
 				},
 				callback: function(r) {
 					if (r.message && r.message.balance > 0) {
-						const advance_balance = r.message.balance;
+						const advance_balance = frappe.utils.flt(r.message.balance || 0);
+						const invoiceTotal = frappe.utils.flt(frm.doc.grand_total || frm.doc.rounded_total || 0);
+						const maxFullAdjust = invoiceTotal > 0 ? Math.min(advance_balance, invoiceTotal) : advance_balance;
 						frappe.prompt(
 							[{
 								fieldname: "adjustment_option",
@@ -57,17 +105,19 @@ frappe.ui.form.on('Sales Invoice', {
 							}],
 							function(values) {
 								let adjustment_amount = 0;
-								
+
 								if (values.adjustment_option === "Full Adjust") {
-									adjustment_amount = Math.min(advance_balance, frm.doc.grand_total || 0);
+									adjustment_amount = maxFullAdjust;
 									frappe.call({
-										method: "aetas_customization.aetas_customization.overrides.sales_invoice.apply_advance_adjustment",
+										method: "aetas_customization.aetas_customization.overrides.sales_invoice.get_unlinked_customer_advances",
 										args: {
-											si_name: frm.doc.name,
-											adjustment_amount: adjustment_amount
+											customer: frm.doc.customer
 										},
 										callback: function(r) {
-											frappe.msgprint(__("Advance of {0} applied", [format_currency(adjustment_amount, "INR")]));
+											const applied = apply_customer_advances_to_form(frm, r.message || [], adjustment_amount);
+											if (applied > 0) {
+												frappe.msgprint(__("Advance of {0} applied", [format_currency(applied, "INR")]));
+											}
 										}
 									});
 								} else if (values.adjustment_option === "Partial Adjust") {
@@ -76,21 +126,33 @@ frappe.ui.form.on('Sales Invoice', {
 											fieldname: "amount",
 											fieldtype: "Currency",
 											label: __("Adjustment Amount"),
+											description: __("Available advance: {0}", [format_currency(advance_balance, "INR")]),
 											reqd: 1,
 										}],
 										function(partial_values) {
-											if (partial_values.amount > advance_balance) {
+											const partialAmount = frappe.utils.flt(partial_values.amount || 0);
+											if (partialAmount <= 0) {
+												frappe.msgprint(__("Amount must be greater than zero"));
+												return;
+											}
+											if (partialAmount > advance_balance) {
 												frappe.msgprint(__("Amount exceeds available advance"));
 												return;
 											}
+											if (invoiceTotal > 0 && partialAmount > invoiceTotal) {
+												frappe.msgprint(__("Amount exceeds invoice total"));
+												return;
+											}
 											frappe.call({
-												method: "aetas_customization.aetas_customization.overrides.sales_invoice.apply_advance_adjustment",
+												method: "aetas_customization.aetas_customization.overrides.sales_invoice.get_unlinked_customer_advances",
 												args: {
-													si_name: frm.doc.name,
-													adjustment_amount: partial_values.amount
+													customer: frm.doc.customer
 												},
 												callback: function(r) {
-													frappe.msgprint(__("Advance of {0} applied", [format_currency(partial_values.amount, "INR")]));
+													const applied = apply_customer_advances_to_form(frm, r.message || [], partialAmount);
+													if (applied > 0) {
+														frappe.msgprint(__("Advance of {0} applied", [format_currency(applied, "INR")]));
+													}
 												}
 											});
 										},
@@ -108,8 +170,9 @@ frappe.ui.form.on('Sales Invoice', {
 			});
 		}
 
-		// Phase 5 Sub-flow B: Auto-populate SI Advance child table when opening existing SI
-		if (!frm.is_new() && frm.doc.customer) {
+		// Phase 5 Sub-flow B: auto-populate SI advances when opening existing SI.
+		if (!frm.is_new() && frm.doc.docstatus === 0 && frm.doc.customer && !frm.__si_advances_autofill_done) {
+			frm.__si_advances_autofill_done = true;
 			frappe.call({
 				method: "aetas_customization.aetas_customization.overrides.sales_invoice.get_advances_received_for_si",
 				args: {
@@ -117,25 +180,23 @@ frappe.ui.form.on('Sales Invoice', {
 				},
 				callback: function(r) {
 					if (r.message && r.message.length > 0) {
-						// Check which rows are already in the advances child table
-						const existing_pes = (frm.doc.advances || []).map(row => row.name);
+						const existingKeys = get_existing_advance_keys(frm);
+						let added = 0;
 						
 						r.message.forEach(adv_row => {
-							// Skip if already present (idempotency)
-							if (!existing_pes.includes(adv_row.payment_entry)) {
-								// Append to native ERPNext "advances" child table
-								// Using reference_type="Aetas Advance Payment Receipt", reference_name=apr_name
-								frm.add_child("advances", {
-									name: adv_row.payment_entry,
-									reference_type: "Aetas Advance Payment Receipt",
-									reference_name: adv_row.apr_name,
-									advance_amount: adv_row.amount,
-									allocated_amount: 0,
-								});
-							}
+							const key = `Payment Entry::${adv_row.payment_entry}`;
+							if (existingKeys.has(key)) return;
+							frm.add_child("advances", {
+								reference_type: "Payment Entry",
+								reference_name: adv_row.payment_entry,
+								advance_amount: adv_row.amount,
+								allocated_amount: 0,
+							});
+							existingKeys.add(key);
+							added += 1;
 						});
 						
-						if (r.message.length > 0) {
+						if (added > 0) {
 							frm.refresh_field("advances");
 							frappe.msgprint(__("Advances populated from customer payment history"));
 						}
