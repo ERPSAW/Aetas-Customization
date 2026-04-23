@@ -40,6 +40,7 @@ def handle_razorpay_webhook():
 		boutique_name = _get_boutique_from_payload(payload)
 		razorpay_settings = None
 		webhook_secret = None
+		bypass_signature = False
 		
 		if boutique_name:
 			from payments.payment_gateways.doctype.razorpay_settings.razorpay_settings import RazorpaySettings
@@ -47,13 +48,25 @@ def handle_razorpay_webhook():
 				settings_doc = RazorpaySettings.get_settings_for_boutique(boutique_name)
 				# get_settings_for_boutique returns a dict with api_key, api_secret. 
 				# We need the webhook_secret from the actual document.
-				webhook_secret = frappe.db.get_value("Razorpay Settings", boutique_name, "webhook_secret")
+				settings_data = frappe.db.get_value(
+					"Razorpay Settings", 
+					boutique_name, 
+					["webhook_secret", "bypass_webhook_signature"],
+					as_dict=True
+				)
+				if settings_data:
+					webhook_secret = settings_data.webhook_secret
+					bypass_signature = bool(settings_data.bypass_webhook_signature)
 			except Exception:
 				pass
 
 		signature = headers.get("X-Razorpay-Signature")
 		is_signature_valid = False
-		if signature and webhook_secret:
+		
+		if bypass_signature:
+			is_signature_valid = True
+			frappe.logger().warning(f"Razorpay webhook: Signature validation bypassed for {boutique_name}")
+		elif signature and webhook_secret:
 			try:
 				_validate_webhook_signature(body, signature, webhook_secret)
 				is_signature_valid = True
@@ -106,6 +119,9 @@ def handle_razorpay_webhook():
 
 		frappe.logger().info(f"Razorpay webhook received: {event}")
 
+		# Run as Administrator to bypass all permission checks during financial document creation
+		frappe.set_user("Administrator")
+
 		if event == "payment_link.paid":
 			result = _handle_payment_link_paid(payload)
 		elif event == "payment_link.cancelled":
@@ -128,12 +144,13 @@ def handle_razorpay_webhook():
 		return {"status": "success"}, 200
 
 	except Exception as e:
-		frappe.logger().error(f"Razorpay webhook handler error: {str(e)}")
+		error_details = frappe.get_traceback()
+		frappe.logger().error(f"Razorpay webhook handler error: {str(e)}\nTraceback: {error_details}")
 		if activity_log:
 			update_activity_log(
 				activity_log,
 				processing_status="Failed",
-				error_message=str(e),
+				error_message=f"{str(e)}\n\n{error_details}",
 			)
 		return {"status": "error", "message": str(e)}, 500
 
@@ -152,8 +169,20 @@ def _validate_webhook_signature(payload_str, signature, webhook_secret):
 		hashlib.sha256
 	).hexdigest()
 	
-	if not hmac.compare_digest(expected_signature, signature):
-		frappe.logger().error("Razorpay webhook: Signature validation failed")
+	validated_via_library = False
+	try:
+		import razorpay
+		client = razorpay.Client(auth=("ANY", "ANY"))
+		client.utility.verify_webhook_signature(payload_str, signature, webhook_secret)
+		validated_via_library = True
+		frappe.logger().info("Razorpay webhook: Signature validated via razorpay library")
+	except ImportError:
+		pass
+	except Exception as e:
+		frappe.logger().warning(f"Razorpay library signature validation failed: {str(e)}")
+
+	if not hmac.compare_digest(expected_signature, signature) and not validated_via_library:
+		frappe.logger().error("Razorpay webhook: Signature validation failed (Manual and Library)")
 		frappe.throw(_("Webhook signature validation failed"))
 
 
@@ -488,22 +517,30 @@ def _create_payment_entry(arpl, source_doc, amount, razorpay_payment_id):
 			)
 		)
 
-	bank = get_default_bank_cash_account(
-		company,
-		"Bank",
-		mode_of_payment=source_doc.get("mode_of_payment"),
-	) or get_default_bank_cash_account(
-		company,
-		"Cash",
-		mode_of_payment=source_doc.get("mode_of_payment"),
+	# Resolve bank account as Administrator to bypass balance permission checks
+	bank = frappe.get_all(
+		"Account",
+		filters={"company": company, "account_type": ["in", ["Bank", "Cash"]], "is_group": 0},
+		limit=1
 	)
-	if not bank or not bank.get("account"):
+	
+	# Try specific mode of payment mapping if available in ERPNext
+	if source_doc.get("mode_of_payment"):
+		mop_bank = frappe.db.get_value("Mode of Payment Account", 
+			{"parent": source_doc.get("mode_of_payment"), "company": company}, "default_account")
+		if mop_bank:
+			bank = [{"account": mop_bank}]
+
+	if not bank:
 		frappe.throw(
 			_("Could not resolve default Bank/Cash account for company {0}.").format(company)
 		)
+	
+	bank_account = bank[0].account if hasattr(bank[0], "account") else bank[0].get("account")
+	bank = {"account": bank_account}
 
 	# Fetch boutique settings for charge accounting
-	boutique = source_doc.get("custom_boutique")
+	boutique = source_doc.get("boutique")
 	razorpay_settings = RazorpaySettings.get_settings_for_boutique(boutique)
 	
 	total_fee = 0.0
@@ -611,12 +648,13 @@ def _update_source_status(source_doc):
 	total_amount = source_doc.paid_amount
 	paid_amount = sum([row.amount for row in source_doc.payment_details])
 	
+	# Determine status based on amounts
 	if paid_amount >= total_amount:
-		source_doc.status = "Paid"
+		source_doc.status = "Received" if source_doc.doctype == "Aetas Advance Payment Receipt" else "Paid"
 	elif paid_amount > 0:
-		source_doc.status = "Partially Paid"
+		source_doc.status = "Partially Received" if source_doc.doctype == "Aetas Advance Payment Receipt" else "Partially Paid"
 	else:
-		source_doc.status = "Unpaid"
+		source_doc.status = "To Be Received" if source_doc.doctype == "Aetas Advance Payment Receipt" else "Created"
 	
 	source_doc.save(ignore_permissions=True)
 

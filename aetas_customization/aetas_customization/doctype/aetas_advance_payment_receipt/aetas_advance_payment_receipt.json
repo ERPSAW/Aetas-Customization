@@ -14,6 +14,7 @@
   "customer",
   "date",
   "paid_amount",
+  "total_paid",
   "column_break_mvql6",
   "payment_entry",
   "sales_person",
@@ -82,13 +83,19 @@
   {
    "fieldname": "paid_amount",
    "fieldtype": "Float",
-   "label": "Paid Amount"
+   "label": "Total Amount"
+  },
+  {
+   "fieldname": "total_paid",
+   "fieldtype": "Float",
+   "label": "Total Paid So Far",
+   "read_only": 1
   },
   {
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
-   "options": "\nTo Be Received\nReceived"
+   "options": "\nTo Be Received\nPartially Received\nReceived"
   },
   {
    "depends_on": "eval:doc.status == \"Received\"",
@@ -138,6 +145,10 @@
   {
    "color": "Orange",
    "title": "To Be Received"
+  },
+  {
+   "color": "Blue",
+   "title": "Partially Received"
   },
   {
    "color": "Green",

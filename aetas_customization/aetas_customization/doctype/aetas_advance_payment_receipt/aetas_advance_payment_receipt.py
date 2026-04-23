@@ -23,7 +23,9 @@ class AetasAdvancePaymentReceipt(Document):
 			frappe.throw(_("Boutique is required for payment processing."))
 
 		if not self.paid_amount or self.paid_amount <= 0:
-			frappe.throw(_("Paid Amount must be greater than zero."))
+			frappe.throw(_("Total Amount must be greater than zero."))
+
+		self.calculate_total_paid()
 
 		if self.utr_no:
 			duplicate_name = frappe.db.exists(
@@ -40,8 +42,8 @@ class AetasAdvancePaymentReceipt(Document):
 		if self.status == "Received" and not self.payment_entry:
 			frappe.throw(_("Payment Entry is required when status is Received."))
 
-	def get_outstanding_amount(self):
-		"""Return the amount still outstanding on this receipt (paid_amount minus submitted PEs)."""
+	def calculate_total_paid(self):
+		"""Update self.total_paid based on submitted Payment Entries."""
 		paid = frappe.db.sql(
 			"""
 			SELECT COALESCE(SUM(paid_amount), 0)
@@ -51,7 +53,12 @@ class AetasAdvancePaymentReceipt(Document):
 			""",
 			self.name,
 		)[0][0]
-		return flt(self.paid_amount) - flt(paid)
+		self.total_paid = flt(paid)
+
+	def get_outstanding_amount(self):
+		"""Return the amount still outstanding on this receipt (paid_amount minus submitted PEs)."""
+		self.calculate_total_paid()
+		return flt(self.paid_amount) - flt(self.total_paid)
 
 
 @frappe.whitelist()
@@ -74,12 +81,9 @@ def generate_payment_link_for_apr(apr_name, amount):
 	apr = frappe.get_doc("Aetas Advance Payment Receipt", apr_name)
 	outstanding = apr.get_outstanding_amount()
 
-	if frappe.db.exists(
-		"Aetas Razorpay Payment Link",
-		{"reference_docname": apr_name, "status": "Paid"},
-	):
+	if outstanding <= 0:
 		frappe.throw(
-			_("A payment has already been completed for this Advance Payment Receipt.")
+			_("This Advance Payment Receipt has already been fully paid.")
 		)
 
 	if amount <= 0:
