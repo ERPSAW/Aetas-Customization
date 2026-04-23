@@ -541,20 +541,24 @@ def _create_payment_entry(arpl, source_doc, amount, razorpay_payment_id):
 
 	# Fetch boutique settings for charge accounting
 	boutique = source_doc.get("boutique")
-	razorpay_settings = RazorpaySettings.get_settings_for_boutique(boutique)
+	from payments.payment_gateways.doctype.razorpay_settings.razorpay_settings import RazorpaySettings
+	
+	# Get settings as document to ensure we have all fields including charge_account
+	razorpay_settings_data = RazorpaySettings.get_settings_for_boutique(boutique)
+	razorpay_settings = frappe.get_doc("Razorpay Settings", razorpay_settings_data.get("doc_name"))
 	
 	total_fee = 0.0
 	charge_account = razorpay_settings.get("charge_account")
 	accounting_option = razorpay_settings.get("charge_accounting_option")
 	fee_percentage = flt(razorpay_settings.get("transaction_fee_percentage")) or 2.36
 
-	if charge_account:
-		total_fee = flt(amount_in_inr * (fee_percentage / 100.0), pe.precision("paid_amount") if "pe" in locals() else 2)
-
 	posting_date = source_doc.get("date") or now_datetime().date()
 
 	pe = frappe.new_doc("Payment Entry")
-	pe.company = company
+
+	if charge_account:
+		total_fee = flt(amount_in_inr * (fee_percentage / 100.0), pe.precision("paid_amount"))
+		frappe.logger().info(f"Razorpay webhook: Calculated fee {total_fee} for amount {amount_in_inr} using {fee_percentage}%")
 	pe.posting_date = posting_date
 	pe.payment_type = "Receive"
 	pe.party_type = "Customer"
