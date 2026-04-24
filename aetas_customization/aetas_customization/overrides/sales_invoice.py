@@ -89,8 +89,22 @@ def before_submit(self, method):
 
 def on_submit(self, method):
     """
-    Called when Sales Invoice is submitted. Marks coupon as Used and updates redeemed amount.
+    Called when Sales Invoice is submitted.
     """
+    # Link APR Payment Detail rows to this Sales Invoice
+    if self.get("advances"):
+        for row in self.advances:
+            if row.reference_type == "Payment Entry" and row.reference_name:
+                # Find the APR Payment Detail row for this Payment Entry
+                apr_details = frappe.db.get_all(
+                    "Aetas APR Payment Detail",
+                    filters={"payment_entry": row.reference_name},
+                    fields=["name", "parent"]
+                )
+                for detail in apr_details:
+                    frappe.db.set_value("Aetas APR Payment Detail", detail.name, "sales_invoice", self.name)
+                    frappe.logger().info(f"Linked APR {detail.parent} payment row {detail.name} to Sales Invoice {self.name}")
+
     if self.custom_lead_ref:
         frappe.db.set_value(
             "Lead",
@@ -159,8 +173,14 @@ def on_submit(self, method):
 
 def on_cancel(self, method):
     """
-    Called when Sales Invoice is cancelled. Revert redeemed_amount and coupon status.
+    Called when Sales Invoice is cancelled.
     """
+    # Unlink APR Payment Detail rows from this Sales Invoice
+    frappe.db.sql(
+        "UPDATE `tabAetas APR Payment Detail` SET sales_invoice = NULL WHERE sales_invoice = %s",
+        self.name
+    )
+
     if self.custom_lead_ref:
         frappe.db.set_value(
             "Lead", self.custom_lead_ref, "custom_si_ref", None, update_modified=False

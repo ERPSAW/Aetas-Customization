@@ -552,6 +552,8 @@ def _create_payment_entry(arpl, source_doc, amount, razorpay_payment_id):
 	accounting_option = razorpay_settings.get("charge_accounting_option")
 	fee_percentage = flt(razorpay_settings.get("transaction_fee_percentage")) or 2.36
 
+	frappe.logger().info(f"Razorpay webhook: Accounting Option={accounting_option}, Charge Account={charge_account}, Fee%={fee_percentage}")
+
 	posting_date = source_doc.get("date") or now_datetime().date()
 
 	pe = frappe.new_doc("Payment Entry")
