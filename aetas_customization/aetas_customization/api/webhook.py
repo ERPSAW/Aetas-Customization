@@ -259,7 +259,14 @@ def _handle_payment_link_paid(payload):
 		source_doc = frappe.get_doc(source_doctype, source_docname)
 		
 		resolved_amount = amount or int((arpl.amount or 0) * 100)
-		pe = _create_payment_entry(arpl, source_doc, resolved_amount, razorpay_payment_id)
+		
+		# Extract fee from payment entity if available
+		payment_fee = 0
+		payment_data = payload.get("payload", {}).get("payment", {}).get("entity", {})
+		if payment_data and payment_data.get("fee"):
+			payment_fee = payment_data.get("fee")
+			
+		pe = _create_payment_entry(arpl, source_doc, resolved_amount, razorpay_payment_id, payment_fee)
 		frappe.logger().info(f"Razorpay webhook: Created Payment Entry {pe.name} for {source_doctype} {source_docname}")
 		
 		# Update ARPL status
@@ -479,7 +486,7 @@ def _handle_payment_failed(payload):
 		raise
 
 
-def _create_payment_entry(arpl, source_doc, amount, razorpay_payment_id):
+def _create_payment_entry(arpl, source_doc, amount, razorpay_payment_id, payment_fee=0):
 	"""
 	Create a Payment Entry for the successful payment.
 	
@@ -547,21 +554,19 @@ def _create_payment_entry(arpl, source_doc, amount, razorpay_payment_id):
 	razorpay_settings_data = RazorpaySettings.get_settings_for_boutique(boutique)
 	razorpay_settings = frappe.get_doc("Razorpay Settings", razorpay_settings_data.get("doc_name"))
 	
-	total_fee = 0.0
+	total_fee = flt(payment_fee) / 100.0  # Convert paise to INR
 	charge_account = razorpay_settings.get("charge_account")
 	accounting_option = razorpay_settings.get("charge_accounting_option")
-	fee_percentage = flt(razorpay_settings.get("transaction_fee_percentage")) or 2.36
 
-	frappe.logger().info(f"Razorpay webhook: Accounting Option={accounting_option}, Charge Account={charge_account}, Fee%={fee_percentage}")
+	frappe.logger().info(f"Razorpay webhook: Accounting Option={accounting_option}, Charge Account={charge_account}, Payload Fee={total_fee}")
 
 	posting_date = source_doc.get("date") or now_datetime().date()
 
 	pe = frappe.new_doc("Payment Entry")
 
-	if charge_account:
-		total_fee = flt(amount_in_inr * (fee_percentage / 100.0), pe.precision("paid_amount"))
-		frappe.logger().info(f"Razorpay webhook: Calculated fee {total_fee} for amount {amount_in_inr} using {fee_percentage}%")
+	# Logic for total_fee is now directly from payload
 	pe.posting_date = posting_date
+
 	pe.payment_type = "Receive"
 	pe.party_type = "Customer"
 	pe.party = customer
