@@ -343,20 +343,18 @@ Allow users to associate an APR payment row with a Sales Invoice directly from t
 
 ### Phase 6: Razorpay Charges Accounting Options
 #### Objective
-Support transaction-wise charge accounting using configurable posting strategy.
-
-#### In Scope
-- payments charge calculation and posting logic.
+Automate fee recording based on actual transaction data from the Razorpay payload.
 
 #### Primary Tasks
-1. Compute charges per transaction.
-2. Implement Option A posting in Payment Entry.
-3. Implement Option B automatic JV creation.
-4. Allow configuration to select option.
+1. Extract exact Razorpay fee from webhook payload (converted from paise).
+2. Support Option A (Deduction Table) and Option B (Independent Journal Entry).
+3. Post fees to the configured Charge and Tax accounts per boutique.
+4. Removed reliance on estimated % rates for 100% reconciliation accuracy.
 
 #### Exit Criteria
 1. Charges reflected correctly for full and partial payments.
 2. Posting follows configured option without double booking.
+3. Legacy `transaction_fee_percentage` field removed from system.
 
 #### Functional Validations
 | # | Scenario | Expected Result | Pass Condition | Test ID |

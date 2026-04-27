@@ -13,11 +13,11 @@ The integration replaces the standard "Payment Link" with a specialized **Aetas 
 4.  **Automatic Payment Entry**:
     - The webhook creates a `Payment Entry` in ERPNext.
     - Status of the source APR is updated to `Paid`.
-    - **Fees are accounted for automatically** (Phase 6).
+    - **Fees are accounted for automatically**.
 
 ---
 
-## 2. Advanced Accounting: Razorpay Fees (Phase 6)
+## 2. Advanced Accounting: Razorpay Fees
 
 The system automatically calculates and records Razorpay transaction fees to ensure bank reconciliations match net payouts.
 
@@ -26,13 +26,14 @@ Navigate to **Razorpay Settings** to configure these fields:
 - **Charge Accounting Option**:
   - **Option A (Deduction)**: Adds a row to the "Deductions" table of the Payment Entry. The customer gets full credit, but the bank debit is net of fees.
   - **Option B (Journal Entry)**: Creates a separate Journal Entry for the fee, keeping the Payment Entry simple.
-- **Transaction Fee %**: Default is `2.36` (2% + 18% GST).
 - **Charge Account**: The expense ledger for fees (e.g., "Bank Charges").
 - **Tax Account**: The input tax ledger for GST on fees.
 
+*Note: Transaction Fee % is no longer required as fees are extracted directly from the Razorpay payment payload for 100% accuracy.*
+
 ---
 
-## 3. Sales Invoice Integration (Phase 5)
+## 3. Sales Invoice Integration
 
 When creating a **Sales Invoice** for a customer who has paid an advance:
 - **Prompt**: A dialog appears if unlinked APRs exist.
@@ -63,4 +64,4 @@ When creating a **Sales Invoice** for a customer who has paid an advance:
 A: If **Option A** is enabled, the Bank Account debit is the *net* amount after fees, while the Customer credit remains the *gross* amount.
 
 **Q: What happens if a webhook fails?**
-A: The `Aetas Advance Payment Receipt` remains in `Unpaid` status. Check the **Error Log** in ERPNext for the specific traceback from `webhook.py`.
+A: The `Aetas Advance Payment Receipt` remains in `Unpaid` status. Check the **Aetas Razorpay Activity Log** for the specific traceback. You can use the **Retry Processing** button on a Failed Inbound log to re-trigger the accounting logic after fixing any configuration issues.

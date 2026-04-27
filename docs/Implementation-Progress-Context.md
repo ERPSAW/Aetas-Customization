@@ -4,20 +4,21 @@
 This document captures the current implementation state for Razorpay multi-boutique + partial payment flow so a new AI session can continue work without re-discovery.
 
 ## Last Updated
-- Date: 2026-04-22
+- Date: 2026-04-27
 - Source branches checked:
   - aetas_customization: `multi-razor`
   - payments: `multi-razor`
 
-### Session Delta (2026-04-22)
-- Completed Phase 6: Razorpay Charges Accounting.
-  - Added configuration fields to `Razorpay Settings` (Option A/B, Charge Account, Fee Percentage).
-  - Enhanced webhook `_create_payment_entry` to calculate fees and handle deductions (Option A) or separate Journal Entries (Option B).
-  - Resolved Cost Center from Boutique for fee rows.
-  - Added unit tests for both Option A and Option B fee paths (green).
-- Stabilized test environment for `aetas_customization` on shared site.
-  - Implemented `test_setup.py` hooks to normalize mandatory fields/GST during tests.
-  - Resolved `ImplicitCommitError` and `MandatoryError` in test suite.
+### Session Delta (2026-04-27)
+- **Refined Phase 6 (Charges Accounting)**:
+  - Switched from percentage-based fee calculation to **direct payload extraction**.
+  - Fees are now pulled from `payload["payload"]["payment"]["entity"]["fee"]` (paise) for absolute accuracy.
+  - Removed `transaction_fee_percentage` field from `Razorpay Settings` and executed database migration.
+- **Enhanced Observability (Activity Logs)**:
+  - Added a **Retry Processing** button to the `Aetas Razorpay Activity Log` (Inbound + Failed status).
+  - Implemented `@frappe.whitelist()` method `retry_processing` to safely re-read payload and re-attempt financial posting under Administrator context.
+- **System Stability**:
+  - Resolved `Protocol Error` and `Database Metadata Locks` during migration and high-concurrency naming series updates by force-clearing MariaDB process list.
 
 ### Current State After This Pass
 - Phase 1-7: 100% implemented, verified, and documented.
