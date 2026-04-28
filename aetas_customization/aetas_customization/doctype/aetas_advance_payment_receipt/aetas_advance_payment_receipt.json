@@ -9,16 +9,20 @@
  "engine": "InnoDB",
  "field_order": [
   "status",
-  "customer",
+  "boutique",
   "cost_center",
+  "customer",
   "date",
   "paid_amount",
+  "total_paid",
   "column_break_mvql6",
   "payment_entry",
   "sales_person",
   "remarks",
   "mode_of_payment",
-  "utr_no"
+  "utr_no",
+  "receipts",
+  "payment_details"
  ],
  "fields": [
   {
@@ -28,10 +32,21 @@
    "options": "Customer"
   },
   {
+   "fieldname": "boutique",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Boutique",
+   "options": "Boutique",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "boutique.boutique_cost_center",
+   "fetch_if_empty": 1,
    "fieldname": "cost_center",
    "fieldtype": "Link",
    "label": "Cost Center",
-   "options": "Cost Center"
+   "options": "Cost Center",
+   "read_only": 1
   },
   {
    "default": "Today",
@@ -68,13 +83,19 @@
   {
    "fieldname": "paid_amount",
    "fieldtype": "Float",
-   "label": "Paid Amount"
+   "label": "Total Amount"
+  },
+  {
+   "fieldname": "total_paid",
+   "fieldtype": "Float",
+   "label": "Total Paid So Far",
+   "read_only": 1
   },
   {
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
-   "options": "\nTo Be Received\nReceived"
+   "options": "\nTo Be Received\nPartially Received\nReceived"
   },
   {
    "depends_on": "eval:doc.status == \"Received\"",
@@ -83,15 +104,25 @@
    "label": "Payment Entry",
    "options": "Payment Entry",
    "read_only": 1
+  },
+  {
+   "fieldname": "payment_details",
+   "fieldtype": "Table",
+   "label": "Payment Details",
+   "options": "Aetas APR Payment Detail"
+  },
+  {
+   "fieldname": "receipts",
+   "fieldtype": "Section Break"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-08-14 16:00:47.811015",
+ "modified": "2026-04-10 10:42:52.347247",
  "modified_by": "Administrator",
  "module": "Aetas Customization",
  "name": "Aetas Advance Payment Receipt",
- "naming_rule": "Expression (old style)",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {
@@ -107,12 +138,17 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [
   {
    "color": "Orange",
    "title": "To Be Received"
+  },
+  {
+   "color": "Blue",
+   "title": "Partially Received"
   },
   {
    "color": "Green",

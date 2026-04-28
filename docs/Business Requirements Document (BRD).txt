@@ -1,0 +1,256 @@
+Business Requirements Document (BRD)
+Razorpay Integration with ERPNext (Including Partial
+Payments)
+1. Document Overview
+1.1 Purpose
+To automate customer payment collection in ERPNext using Razorpay, enabling:
+•
+•
+•
+•
+•
+
+Boutique-wise payment gateway configuration
+Payment link generation
+Partial and full payment handling
+Automated accounting and reconciliation
+Advance adjustment during invoicing
+
+1.2 Scope
+This BRD includes:
+•
+•
+•
+•
+
+Boutique/Main Office wise Razorpay credentials
+Advance Payment Receipt automation
+Sales Invoice payment collection
+Partial & multiple payments
+
+•
+•
+•
+
+Automated Payment Entry and JV creation
+Customer notifications
+Payment link expiry and payment mode controls
+
+2. Stakeholders
+Stakeholder
+Boutique Users
+Finance Team
+Customers
+
+Role
+Generate payment links, track payments
+Accounting, reconciliation
+Make online payments
+
+IT / ERP Team
+
+Implementation & support
+
+3. AS-IS Process (Current State)
+3.1 Advance Payment Collection
+•
+•
+•
+
+Advance Payment Receipt is created manually
+No online payment integration
+Payment Entry created manually
+
+3.2 Sales Invoice Collection
+•
+•
+
+Sales Invoice payments recorded manually
+Advance adjustment done manually
+
+3.3 Accounting & Charges
+•
+•
+•
+
+Razorpay charges manually calculated
+Journal Vouchers created manually
+High reconciliation effort
+
+3.4 Limitations
+•
+•
+•
+•
+
+Manual errors
+No partial payment visibility
+Delayed customer communication
+No payment link expiry or tracking
+
+4. TO-BE Process (Proposed State)
+4.1 Boutique-Wise Razorpay Configuration
+•
+
+•
+
+Each Boutique / Main Office will maintain:
+o Razorpay API Key
+o Razorpay Secret
+Credentials stored securely in ERPNext
+
+•
+
+System auto-selects credentials based on Boutique
+
+4.2 Advance Payment Receipt – Automated Flow
+4.2.1 Payment Link Generation
+•
+•
+
+•
+
+User can generate Razorpay Payment Link from:
+o Advance Payment Receipt
+Link can be generated for:
+o Full amount
+o Partial amount
+ERP validates amount ≤ outstanding
+
+4.2.2 Payment Modes
+Allowed modes:
+•
+•
+•
+•
+
+Credit Card
+Debit Card
+Net Banking
+UPI
+
+4.2.3 Payment Link Controls
+Control
+Expiry
+Reuse
+Multiple links
+
+Behaviour
+Configurable
+One-time use
+Allowed till outstanding = 0
+
+4.3 Payment Processing & Status Update
+4.3.1 Successful Payment
+On Razorpay webhook success:
+•
+•
+•
+•
+•
+
+Auto creation of Payment Entry
+Linked to Advance Payment Receipt
+Paid & outstanding amounts updated
+Status updated:
+o Unpaid / Partially Paid / Paid
+Customer notified via email (if available)
+
+4.3.2 Failed Payment
+•
+•
+•
+
+Status marked as Failed
+No financial impact
+Failure notification sent to customer
+
+4.4 Sales Invoice – Payment Collection
+4.4.1 Payment Link from Sales Invoice
+•
+
+Payment link can be generated for:
+o Full invoice amount
+o Partial invoice amount
+
+•
+
+Multiple links allowed until invoice is fully paid
+
+4.4.2 Advance Adjustment Prompt
+When creating Sales Invoice:
+•
+•
+
+System checks customer advance balance
+Popup:
+“Customer has Advance of ₹X. Adjust against invoice?”
+
+•
+
+User can:
+o Fully adjust
+o Partially adjust
+o Skip adjustment
+
+4.4.3 Invoice Status Handling
+Status
+Unpaid
+Partially Paid
+Paid
+
+Condition
+Paid = 0
+Paid < Invoice Total
+Paid = Invoice Total
+
+4.5 Partial Payment Handling (Core Requirement)
+4.5.1 Rules
+•
+•
+•
+
+Partial payment amount must be > 0
+Amount ≤ outstanding
+Overpayments not allowed
+
+4.5.2 Multiple Payments
+•
+
+•
+
+System supports:
+o Multiple partial payments
+o Multiple payment links
+Each successful payment creates a separate Payment Entry
+
+4.5.3 Customer Visibility
+•
+
+Customer notified on:
+o Each payment success
+
+4.6 Razorpay Charges Accounting
+4.6.1 Charge Calculation
+•
+•
+
+Charges calculated per transaction
+Supports partial payments
+
+4.6.2 Accounting Options (Configurable)
+Option A: Expense in Payment Entry
+•
+•
+•
+
+Bank (Net Amount) – Debit
+Razorpay Charges – Debit
+Customer – Credit
+Option B: Automatic Journal Voucher
+
+•
+
+JV auto-created per transaction
+
+

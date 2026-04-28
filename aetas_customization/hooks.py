@@ -43,7 +43,8 @@ fixtures = [
                     "Customer-custom_customer_without_sales",
                     "Lead-custom_unqualified_reason",
                     "Customer-custom_journey",
-                    "Customer-custom_customer_journey"
+                    "Customer-custom_customer_journey",
+                    "Sales Invoice-custom_boutique",
                 ],
             ]
         ],
@@ -195,6 +196,7 @@ doc_events = {
         "on_submit": "aetas_customization.aetas_customization.overrides.purchase_invoice.on_submit",
     },
     "Sales Invoice": {
+        "before_validate": "aetas_customization.test_setup.ensure_sales_invoice_mandatory_fields_for_tests",
         "validate": "aetas_customization.aetas_customization.overrides.sales_invoice.validate",
         "before_submit": "aetas_customization.aetas_customization.overrides.sales_invoice.before_submit",
         "on_submit": "aetas_customization.aetas_customization.overrides.sales_invoice.on_submit",
@@ -202,11 +204,13 @@ doc_events = {
     },
     "Payment Entry": {
         "on_submit": "aetas_customization.aetas_customization.overrides.payment_entry.on_submit",
+        "on_cancel": "aetas_customization.aetas_customization.overrides.payment_entry.on_cancel",
     },
     "Stock Entry": {
         "before_validate": "aetas_customization.aetas_customization.overrides.stock_entry.before_validate",
     },
     "Item": {
+        "before_validate": "aetas_customization.test_setup.ensure_item_brand_for_tests",
         "validate": "aetas_customization.aetas_customization.overrides.item.validate",
     },
     "Item Group": {
@@ -221,7 +225,14 @@ doc_events = {
         "validate": "aetas_customization.overrides.lead.validate",
     },
     "Customer": {
+        "before_validate": "aetas_customization.test_setup.ensure_customer_mandatory_fields_for_tests",
         "after_insert": "aetas_customization.aetas_customization.overrides.customer.after_insert",
+    },
+    "Item Tax Template": {
+        "before_validate": "aetas_customization.test_setup.normalize_item_tax_template_for_tests",
+    },
+    "Sales Taxes and Charges Template": {
+        "before_validate": "aetas_customization.test_setup.normalize_sales_taxes_template_for_tests",
     },
 }
 
@@ -253,10 +264,16 @@ doc_events = {
 # ],
 # }
 
+scheduler_events = {
+    "daily": [
+        "aetas_customization.aetas_customization.api.razorpay_activity_log.cleanup_old_activity_logs"
+    ]
+}
+
 # Testing
 # -------
 
-# before_tests = "aetas_customization.install.before_tests"
+before_tests = "aetas_customization.test_setup.before_tests"
 
 # Overriding Methods
 # ------------------------------

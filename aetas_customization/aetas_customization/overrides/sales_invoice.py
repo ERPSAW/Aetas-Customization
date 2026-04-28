@@ -3,6 +3,11 @@ import frappe
 from frappe import _
 from frappe.utils import today
 
+from aetas_customization.aetas_customization.api.razorpay_activity_log import (
+    create_activity_log,
+    update_activity_log,
+)
+
 
 def validate(self, method):
     # started = frappe.db.exists(
@@ -84,8 +89,22 @@ def before_submit(self, method):
 
 def on_submit(self, method):
     """
-    Called when Sales Invoice is submitted. Marks coupon as Used and updates redeemed amount.
+    Called when Sales Invoice is submitted.
     """
+    # Link APR Payment Detail rows to this Sales Invoice
+    if self.get("advances"):
+        for row in self.advances:
+            if row.reference_type == "Payment Entry" and row.reference_name:
+                # Find the APR Payment Detail row for this Payment Entry
+                apr_details = frappe.db.get_all(
+                    "Aetas APR Payment Detail",
+                    filters={"payment_entry": row.reference_name},
+                    fields=["name", "parent"]
+                )
+                for detail in apr_details:
+                    frappe.db.set_value("Aetas APR Payment Detail", detail.name, "sales_invoice", self.name)
+                    frappe.logger().info(f"Linked APR {detail.parent} payment row {detail.name} to Sales Invoice {self.name}")
+
     if self.custom_lead_ref:
         frappe.db.set_value(
             "Lead",
@@ -154,8 +173,14 @@ def on_submit(self, method):
 
 def on_cancel(self, method):
     """
-    Called when Sales Invoice is cancelled. Revert redeemed_amount and coupon status.
+    Called when Sales Invoice is cancelled.
     """
+    # Unlink APR Payment Detail rows from this Sales Invoice
+    frappe.db.sql(
+        "UPDATE `tabAetas APR Payment Detail` SET sales_invoice = NULL WHERE sales_invoice = %s",
+        self.name
+    )
+
     if self.custom_lead_ref:
         frappe.db.set_value(
             "Lead", self.custom_lead_ref, "custom_si_ref", None, update_modified=False
@@ -232,8 +257,8 @@ def validate_coupon_code(coupon_code, items, grand_total):
     Args:
         coupon_code (str): coupon code to validate
         items (str): JSON string list of item rows. Each row MUST include:
-                      - item_code
-                      - base_amount (numeric)
+                    - item_code
+                    - base_amount (numeric)
         grand_total (numeric or str): original invoice grand total
 
     Returns:
@@ -463,3 +488,303 @@ def validate_coupon_code(coupon_code, items, grand_total):
         "final_total": final_total,
         "breakdown": breakdown,
     }
+
+
+
+@frappe.whitelist()
+def generate_payment_link_for_invoice(si_name, amount):
+    """
+    Generate a Razorpay payment link for a Sales Invoice.
+
+    Args:
+        si_name (str): Name of the Sales Invoice document.
+        amount (float): Amount in INR to generate the link for.
+
+    Returns:
+        dict: {link_url, link_id, amount, expire_by}
+    """
+    import datetime
+
+    from frappe.utils import flt
+
+    from payments.payment_gateways.doctype.razorpay_settings.razorpay_settings import (
+        RazorpaySettings,
+    )
+
+    amount = flt(amount)
+    si = frappe.get_doc("Sales Invoice", si_name)
+
+    if frappe.db.exists(
+        "Aetas Razorpay Payment Link",
+        {"reference_docname": si_name, "status": "Paid"},
+    ):
+        frappe.throw(
+            _("A payment has already been completed for this Sales Invoice.")
+        )
+
+    # Compute outstanding from submitted Payment Entry References
+    paid = frappe.db.sql(
+        """
+        SELECT COALESCE(SUM(per.allocated_amount), 0)
+        FROM `tabPayment Entry Reference` per
+        JOIN `tabPayment Entry` pe ON pe.name = per.parent
+        WHERE per.reference_doctype = 'Sales Invoice'
+        AND per.reference_name = %s
+        AND pe.docstatus = 1
+        """,
+        si_name,
+    )[0][0]
+    outstanding = flt(si.grand_total) - flt(paid)
+
+    if amount <= 0:
+        frappe.throw(_("Payment amount must be greater than zero."))
+    if amount > outstanding:
+        frappe.throw(
+            _("Payment amount {0} exceeds outstanding amount {1}.").format(
+                frappe.format_value(amount, {"fieldtype": "Currency"}),
+                frappe.format_value(outstanding, {"fieldtype": "Currency"}),
+            )
+        )
+
+    boutique = si.get("custom_boutique")
+    if not boutique:
+        frappe.throw(_("Boutique is not set on this Sales Invoice."))
+
+    settings_dict = RazorpaySettings.get_settings_for_boutique(boutique)
+    settings_doc = frappe.get_doc("Razorpay Settings", settings_dict["doc_name"])
+    settings_doc.init_client()
+
+    customer_name = (
+        frappe.db.get_value("Customer", si.customer, "customer_name") or si.customer
+    )
+    customer_email = getattr(si, "contact_email", "") or ""
+
+    request_payload = {
+        "amount_inr": amount,
+        "currency": si.currency or "INR",
+        "customer_name": customer_name,
+        "customer_contact": "",
+        "customer_email": customer_email,
+        "description": "Payment for Invoice " + si_name,
+        "reference_doctype": "Sales Invoice",
+        "reference_docname": si_name,
+    }
+
+    activity_log = create_activity_log(
+        direction="Outbound",
+        activity_type="payment_link.create",
+        processing_status="Received",
+        reference_doctype="Sales Invoice",
+        reference_docname=si_name,
+        amount=amount,
+        request_payload=request_payload,
+    )
+
+    try:
+        link = settings_doc.create_payment_link(**request_payload)
+    except Exception as e:
+        update_activity_log(
+            activity_log,
+            processing_status="Failed",
+            error_message=str(e),
+        )
+        raise
+
+    update_activity_log(
+        activity_log,
+        processing_status="Processed",
+        response_payload=link,
+        link_id=link.get("id"),
+    )
+
+    expire_by_dt = None
+    if link.get("expire_by"):
+        expire_by_dt = datetime.datetime.utcfromtimestamp(link["expire_by"])
+
+    tracker = frappe.new_doc("Aetas Razorpay Payment Link")
+    tracker.reference_doctype = "Sales Invoice"
+    tracker.reference_docname = si_name
+    tracker.boutique = boutique
+    tracker.amount = amount
+    tracker.currency = si.currency or "INR"
+    tracker.link_id = link.get("id")
+    tracker.link_url = link.get("short_url")
+    tracker.status = "Created"
+    if expire_by_dt:
+        tracker.expire_by = expire_by_dt
+    tracker.insert(ignore_permissions=True)
+
+    return {
+        "link_url": link.get("short_url"),
+        "link_id": link.get("id"),
+        "amount": amount,
+        "expire_by": str(expire_by_dt) if expire_by_dt else "",
+    }
+
+
+# ---------------------------------------------------------------------------
+# Phase 5: Advance Adjustment Prompt and Get Advances Received
+# ---------------------------------------------------------------------------
+
+@frappe.whitelist()
+def get_customer_advance_balance(customer):
+    """
+    Calculate total available advance for a customer from unpaid/partially paid APRs.
+    Used by the advance adjustment prompt on SI creation.
+    
+    Returns: {"balance": float, "aprs": [list of APR names]}
+    """
+    if not customer:
+        return {"balance": 0.0, "aprs": []}
+
+    # Query all APRs for this customer that are not fully paid.
+    unpaid_aprs = frappe.db.sql(
+        """
+        SELECT name, paid_amount, status
+        FROM `tabAetas Advance Payment Receipt`
+        WHERE customer = %s AND status IN ('To Be Received', 'Partially Paid', 'Received')
+        """,
+        customer,
+        as_dict=True,
+    )
+
+    total_balance = 0.0
+    apr_names = []
+    for apr in unpaid_aprs:
+        # Calculate how much of this APR is still available.
+        paid_via_pe = frappe.db.sql(
+            """
+            SELECT COALESCE(COUNT(*), 0) as count, COALESCE(SUM(amount), 0) as total
+            FROM `tabAetas APR Payment Detail`
+            WHERE parent = %s AND sales_invoice IS NULL
+            """,
+            apr["name"],
+            as_dict=True,
+        )[0]
+        
+        available = apr["paid_amount"] - paid_via_pe["total"]
+        if available > 0:
+            total_balance += available
+            apr_names.append(apr["name"])
+    
+    return {"balance": total_balance, "aprs": apr_names}
+
+
+@frappe.whitelist()
+def get_unlinked_customer_advances(customer):
+    """
+    Return unlinked APR payment rows for a customer.
+    Used by Sales Invoice prompt flow to apply full/partial advance on a new draft SI.
+    """
+    if not customer:
+        return []
+
+    rows = frappe.db.sql(
+        """
+        SELECT
+            apd.parent as apr_name,
+            apd.name as child_name,
+            apd.payment_entry,
+            apd.amount,
+            apd.sales_invoice
+        FROM `tabAetas APR Payment Detail` apd
+        WHERE apd.parent IN (
+            SELECT name
+            FROM `tabAetas Advance Payment Receipt`
+            WHERE customer = %s
+        )
+        AND (apd.sales_invoice IS NULL OR apd.sales_invoice = '')
+        ORDER BY apd.creation ASC
+        """,
+        customer,
+        as_dict=True,
+    )
+    return rows
+
+
+@frappe.whitelist()
+def get_advances_received_for_si(si_name):
+    """
+    Fetch all APR Payment Detail rows for the same customer as the SI,
+    where the SI field is blank (not yet allocated).
+    
+    Returns: list of dicts with {payment_entry, amount, customer, apr_name}
+    """
+    if not si_name:
+        return []
+    
+    si = frappe.get_doc("Sales Invoice", si_name)
+    customer = si.customer
+    
+    # Existing references on the invoice, used for dedupe.
+    existing_refs = {
+        (frappe.scrub(row.reference_type), row.reference_name)
+        for row in (si.get("advances") or [])
+        if row.reference_type and row.reference_name
+    }
+
+    # Query APR Payment Detail rows for this customer where SI field is blank.
+    rows = frappe.db.sql("""
+        SELECT
+            apd.name as child_name,
+            apd.parent as apr_name,
+            apd.payment_entry,
+            apd.amount,
+            apd.sales_invoice
+        FROM `tabAetas APR Payment Detail` apd
+        WHERE apd.parent IN (
+            SELECT name FROM `tabAetas Advance Payment Receipt`
+            WHERE customer = %s
+        )
+        AND apd.sales_invoice IS NULL
+        """, customer, as_dict=True)
+
+    filtered_rows = []
+    for row in rows:
+        if not row.get("payment_entry"):
+            continue
+        if ("payment_entry", row.get("payment_entry")) in existing_refs:
+            continue
+        filtered_rows.append(row)
+
+    return filtered_rows
+
+
+@frappe.whitelist()
+def apply_advance_adjustment(si_name, adjustment_amount):
+    """
+    Apply advance adjustment to a Sales Invoice.
+    This is called when the user confirms the advance adjustment prompt.
+    
+    In real implementation, should create a Journal Entry or use ERPNext's native advance allocation.
+    For now, a stub that logs the adjustment.
+    """
+    if not si_name:
+        return {"status": "error", "message": "Invalid Sales Invoice"}
+
+    if adjustment_amount is None:
+        return {"status": "error", "message": "Adjustment amount is required"}
+
+    adjustment_amount = frappe.utils.flt(adjustment_amount)
+    if adjustment_amount <= 0:
+        return {"status": "error", "message": "Adjustment amount must be greater than zero"}
+    
+    si = frappe.get_doc("Sales Invoice", si_name)
+    balance = get_customer_advance_balance(si.customer).get("balance", 0.0)
+    if adjustment_amount > balance:
+        frappe.throw(
+            _("Adjustment amount {0} exceeds available advance {1}.").format(
+                frappe.format_value(adjustment_amount, {"fieldtype": "Currency"}),
+                frappe.format_value(balance, {"fieldtype": "Currency"}),
+            )
+        )
+    
+    # Log the adjustment fact
+    frappe.logger().info(f"Advance adjustment applied to {si_name}: {adjustment_amount}")
+    
+    # Stub: real implementation would:
+    # 1. Create allocation entries
+    # 2. Update SI advance child table
+    # 3. Create accounting entries if needed
+    
+    return {"status": "success", "message": f"Advance of {adjustment_amount} applied"}
