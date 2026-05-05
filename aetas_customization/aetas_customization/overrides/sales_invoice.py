@@ -30,14 +30,20 @@ def validate(self, method):
             frappe.msgprint(
                 f"Letter Head must be <b>{letter_head}</b> for Cost Center - {self.cost_center}"
             )
-
-    customer_email_id = frappe.db.get_value("Customer", self.customer, "custom_email")
-    if not customer_email_id:
-        frappe.throw(
-            _("Please set Email ID in Customer, in-order to Proceed with Invoice - <b>{0}</b>").format(
-                self.customer
+    if self.grand_total >= 200000:
+        customer_details = frappe.db.get_value("Customer", self.customer, ["custom_email", "custom_date_of_birth"], as_dict= 1)
+        if not customer_details.custom_email:
+            frappe.throw(
+                _("Please set Email ID in Customer, in-order to Proceed with Invoice - <b>{0}</b>").format(
+                    self.customer
+                )
             )
-        )
+        if not customer_details.custom_date_of_birth:
+            frappe.throw(
+                _("Please set Date of Birth in Customer, in-order to Proceed with Invoice - <b>{0}</b>").format(
+                    self.customer
+                )
+            )
 
     update_mrp_values(self)
     if self.custom_aetas_coupon_code:

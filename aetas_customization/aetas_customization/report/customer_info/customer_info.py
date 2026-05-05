@@ -81,8 +81,8 @@ def get_data(filters):
 			c.customer_name as customer_name,
 			DATE_FORMAT(c.creation, '%%b %%d %%Y %%h:%%i%%p') AS customer_creation,
 			c.custom_sales_person as sales_person,
-			IF(c.custom_contact IS NOT NULL AND c.custom_contact != '', 'Yes', 'No') as mobile,
-			IF(c.custom_email IS NOT NULL AND c.custom_email != '', 'Yes', 'No') as email,
+			IF(c.custom_contact IS NOT NULL AND c.custom_contact != '', '1', '0') as mobile,
+			IF(c.custom_email IS NOT NULL AND c.custom_email != '', '1', '0') as email,
 			CASE 
 				WHEN EXISTS (
 					SELECT 1 
@@ -93,8 +93,8 @@ def get_data(filters):
 					AND dl.parenttype = 'Address'
 					AND a.pincode IS NOT NULL 
 					AND a.pincode != ''
-				) THEN 'Yes'
-				ELSE 'No'
+				) THEN '1'
+				ELSE '0'
 			END as address
 		FROM `tabCustomer` c
 		WHERE {where_clause}
