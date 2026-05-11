@@ -1,0 +1,105 @@
+{
+ "creation": "2026-05-11 00:00:00.000000",
+ "doctype": "DocType",
+ "document_type": "Setup",
+ "engine": "InnoDB",
+ "field_order": [
+  "customer_rules_section",
+  "high_end_customers",
+  "removed_customers_section",
+  "removed_customers",
+  "category_section",
+  "category_mapping",
+  "email_section",
+  "email_subject",
+  "send_time",
+  "email_recipients"
+ ],
+ "fields": [
+  {
+   "fieldname": "customer_rules_section",
+   "fieldtype": "Section Break",
+   "label": "High Value Customers"
+  },
+  {
+   "fieldname": "high_end_customers",
+   "fieldtype": "Table",
+   "label": "High End Customers",
+   "options": "AOT High End Customer",
+   "description": "Customers matching these keywords are tagged as 'High Value'. Match type: Contains = name includes keyword (case-insensitive); Exact = full name match."
+  },
+  {
+   "fieldname": "removed_customers_section",
+   "fieldtype": "Section Break",
+   "label": "Excluded Customers"
+  },
+  {
+   "fieldname": "removed_customers",
+   "fieldtype": "Table",
+   "label": "Exclude from Report",
+   "options": "AOT Removed Customer",
+   "description": "Customers matching these keywords are hidden from all dashboard views and emails."
+  },
+  {
+   "fieldname": "category_section",
+   "fieldtype": "Section Break",
+   "label": "Category Mapping"
+  },
+  {
+   "fieldname": "category_mapping",
+   "fieldtype": "Table",
+   "label": "Category Mapping",
+   "options": "AOT Category Mapping",
+   "description": "Maps ERPNext Item Groups to dashboard category labels (Watches / Accessories / Services). Only mapped item groups are included in the dashboard."
+  },
+  {
+   "fieldname": "email_section",
+   "fieldtype": "Section Break",
+   "label": "Email Settings"
+  },
+  {
+   "fieldname": "email_subject",
+   "fieldtype": "Data",
+   "label": "Email Subject",
+   "default": "AOT Sales Dashboard – {date}",
+   "description": "Use {date} as a placeholder for today's date."
+  },
+  {
+   "fieldname": "send_time",
+   "fieldtype": "Time",
+   "label": "Send Time",
+   "default": "08:00:00",
+   "description": "Time at which the daily dashboard email is sent."
+  },
+  {
+   "fieldname": "email_recipients",
+   "fieldtype": "Table",
+   "label": "Email Recipients",
+   "options": "AOT Email Recipient"
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-05-11 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Aetas Customization",
+ "name": "AOT Dashboard Config",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "title_field": ""
+}
