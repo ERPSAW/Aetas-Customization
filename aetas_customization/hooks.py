@@ -45,6 +45,8 @@ fixtures = [
                     "Customer-custom_journey",
                     "Customer-custom_customer_journey",
                     "Sales Invoice-custom_boutique",
+                    "Lead-custom_product_title", "Lead-custom_model_reference", "Lead-custom_product_price", "Lead-custom_page_url",
+                    "Lead-custom_webhook_idempotency", "Lead-custom_column_break_6dqz1", "Lead-custom_section_break_7yt77"
                 ],
             ]
         ],
