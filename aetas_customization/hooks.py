@@ -269,6 +269,9 @@ doc_events = {
 scheduler_events = {
     "daily": [
         "aetas_customization.aetas_customization.api.razorpay_activity_log.cleanup_old_activity_logs"
+    ],
+    "hourly": [
+        "aetas_customization.aetas_customization.aot_data.check_and_send_dashboard_email"
     ]
 }
 
