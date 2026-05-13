@@ -22,7 +22,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Category Label",
-   "options": "Watches\nAccessories\nServices",
+   "options": "Watches\nAccessories\nJewellery\nServices",
    "reqd": 1
   }
  ],
