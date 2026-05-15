@@ -140,8 +140,8 @@ def fetch_rows(start_date, end_date, config):
             sii.item_group,
             COALESCE(sii.brand, '')       AS brand,
             COALESCE(sii.cost_center, '') AS cost_center,
-            SUM(sii.amount) AS amount,
-            SUM(sii.qty)    AS qty
+            SUM(sii.base_net_amount) AS amount,
+            SUM(sii.qty)             AS qty
         FROM `tabSales Invoice` si
         JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
         WHERE si.docstatus = 1
@@ -288,6 +288,48 @@ def _aggregate_perf(cy, ly, key_field, b2c_only=True):
 
     result.sort(key=lambda x: x['cy_sales'], reverse=True)
     return result
+
+
+# ── Debug helper ─────────────────────────────────────────────────────────────
+
+@frappe.whitelist()
+def debug_category_breakdown(start_date=None, end_date=None):
+    """
+    Returns raw per-item_group totals for a date range so you can
+    cross-check against the item-wise sales register.
+    Call from browser console:
+      frappe.call({ method: '...aot_data.debug_category_breakdown',
+                    args: { start_date: '2026-05-15', end_date: '2026-05-15' },
+                    callback: r => console.table(r.message) })
+    """
+    if not start_date:
+        start_date = end_date = str(date.today())
+    if not end_date:
+        end_date = start_date
+
+    rows = frappe.db.sql("""
+        SELECT
+            sii.item_group,
+            SUM(sii.base_net_amount) AS base_net_amount,
+            SUM(sii.net_amount)      AS net_amount,
+            SUM(sii.amount)          AS amount,
+            SUM(sii.qty)             AS qty,
+            COUNT(DISTINCT si.name)  AS invoices
+        FROM `tabSales Invoice` si
+        JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
+        WHERE si.docstatus = 1
+          AND si.is_return  = 0
+          AND si.posting_date BETWEEN %(start_date)s AND %(end_date)s
+        GROUP BY sii.item_group
+        ORDER BY base_net_amount DESC
+    """, {'start_date': start_date, 'end_date': end_date}, as_dict=True)
+
+    config  = get_config()
+    cat_map = config['category_map']
+    for r in rows:
+        r['mapped_category'] = cat_map.get(r['item_group'] or '') or '(unmapped / excluded)'
+
+    return rows
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -471,15 +513,16 @@ def _generate_excel(snapshot_data, brand_data, store_data):
     r += 1
     net = find('net_revenue'); b2c = find('b2c'); hv = find('high_value')
     for label, val, grwth in [
-        ('Net Revenue ₹Cr',       round(net.get('cy_rev', 0)/1e7, 2), pct_fmt(net.get('growth_rev'))),
-        ('Net Qty',               net.get('cy_qty', 0),               pct_fmt(net.get('growth_qty'))),
-        ('B2C Revenue ₹Cr',       round(b2c.get('cy_rev', 0)/1e7, 2), pct_fmt(b2c.get('growth_rev'))),
-        ('B2C Qty',               b2c.get('cy_qty', 0),               pct_fmt(b2c.get('growth_qty'))),
-        ('High Value Revenue ₹Cr',round(hv.get('cy_rev', 0)/1e7, 2),  pct_fmt(hv.get('growth_rev'))),
-        ('High Value Qty',        hv.get('cy_qty', 0),                pct_fmt(hv.get('growth_qty'))),
+        ('Net Revenue (₹)',        net.get('cy_rev', 0),  pct_fmt(net.get('growth_rev'))),
+        ('Net Qty',                net.get('cy_qty', 0),  pct_fmt(net.get('growth_qty'))),
+        ('B2C Revenue (₹)',        b2c.get('cy_rev', 0),  pct_fmt(b2c.get('growth_rev'))),
+        ('B2C Qty',                b2c.get('cy_qty', 0),  pct_fmt(b2c.get('growth_qty'))),
+        ('High Value Revenue (₹)', hv.get('cy_rev', 0),   pct_fmt(hv.get('growth_rev'))),
+        ('High Value Qty',         hv.get('cy_qty', 0),   pct_fmt(hv.get('growth_qty'))),
     ]:
         ws1.cell(r, 1).value = label
-        ws1.cell(r, 2).value = val
+        ws1.cell(r, 2).value = round(val, 2)
+        ws1.cell(r, 2).number_format = '#,##0'
         ws1.cell(r, 3).value = grwth
         if grwth is not None: ws1.cell(r, 3).number_format = '0.0%'
         r += 1
@@ -489,7 +532,7 @@ def _generate_excel(snapshot_data, brand_data, store_data):
         rows   = snap.get('rows', [])
         cy_col = snap.get('cy_col', 'CY')
         ly_col = snap.get('ly_col', 'LY')
-        headers = ['Row', f'{cy_col} ₹Cr', f'{ly_col} ₹Cr', 'Rev Grwth%',
+        headers = ['Row', f'{cy_col} Rev (₹)', f'{ly_col} Rev (₹)', 'Rev Grwth%',
                    f'{cy_col} Qty', f'{ly_col} Qty', 'Qty Grwth%']
         for c, h in enumerate(headers, 1):
             hdr_cell(ws.cell(start_row, c), h)
@@ -501,11 +544,11 @@ def _generate_excel(snapshot_data, brand_data, store_data):
             # Values
             ws.cell(rr, 1).value = ('    ' if indent else '') + row['label']
             ws.cell(rr, 1).alignment = L_ALIGN
-            ws.cell(rr, 2).value = round(row['cy_rev'] / 1e7, 2)
-            ws.cell(rr, 2).number_format = '₹#,##0.00'
+            ws.cell(rr, 2).value = round(row['cy_rev'], 2)
+            ws.cell(rr, 2).number_format = '#,##0'
             ws.cell(rr, 2).alignment = R_ALIGN
-            ws.cell(rr, 3).value = round(row['ly_rev'] / 1e7, 2)
-            ws.cell(rr, 3).number_format = '₹#,##0.00'
+            ws.cell(rr, 3).value = round(row['ly_rev'], 2)
+            ws.cell(rr, 3).number_format = '#,##0'
             ws.cell(rr, 3).alignment = R_ALIGN
             ws.cell(rr, 4).value = pct_fmt(row['growth_rev'])
             ws.cell(rr, 4).alignment = R_ALIGN
@@ -540,7 +583,7 @@ def _generate_excel(snapshot_data, brand_data, store_data):
 
     def write_perf_table(ws, data, label_header, start_row):
         rows = data.get('rows', [])
-        for c, h in enumerate([label_header, 'Sales ₹Cr', 'Sales Grwth%', 'Units', 'Units Grwth%', 'ASP ₹L', 'ASP Grwth%'], 1):
+        for c, h in enumerate([label_header, 'Sales (₹)', 'Sales Grwth%', 'Units', 'Units Grwth%', 'ASP (₹)', 'ASP Grwth%'], 1):
             hdr_cell(ws.cell(start_row, c), h)
         rr = start_row + 1
         for i, row in enumerate(rows):
@@ -550,8 +593,8 @@ def _generate_excel(snapshot_data, brand_data, store_data):
             ws.cell(rr, 1).fill  = alt_fill
             ws.cell(rr, 1).alignment = L_ALIGN
 
-            ws.cell(rr, 2).value          = round(row['cy_sales'] / 1e7, 2)
-            ws.cell(rr, 2).number_format  = '₹#,##0.00'
+            ws.cell(rr, 2).value          = round(row['cy_sales'], 2)
+            ws.cell(rr, 2).number_format  = '#,##0'
             ws.cell(rr, 2).font           = Font(color='1E293B', size=9)
             ws.cell(rr, 2).fill           = alt_fill
             ws.cell(rr, 2).alignment      = R_ALIGN
@@ -573,8 +616,8 @@ def _generate_excel(snapshot_data, brand_data, store_data):
             ws.cell(rr, 5).alignment      = R_ALIGN
             apply_growth_color(ws.cell(rr, 5), row['growth_units'])
 
-            ws.cell(rr, 6).value          = round(row['cy_asp'] / 1e5, 2) if row['cy_asp'] else 0
-            ws.cell(rr, 6).number_format  = '₹#,##0.00'
+            ws.cell(rr, 6).value          = round(row['cy_asp'], 2) if row['cy_asp'] else 0
+            ws.cell(rr, 6).number_format  = '#,##0'
             ws.cell(rr, 6).font           = Font(color='1E293B', size=9)
             ws.cell(rr, 6).fill           = alt_fill
             ws.cell(rr, 6).alignment      = R_ALIGN
