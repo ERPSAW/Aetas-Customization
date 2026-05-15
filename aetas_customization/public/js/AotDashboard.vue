@@ -82,7 +82,7 @@
           <div class="aot-table-pair">
             <!-- Revenue table -->
             <div class="aot-table-card">
-              <div class="aot-table-title">Net Revenue (₹ Cr)</div>
+              <div class="aot-table-title">Net Revenue</div>
               <div class="aot-table-scroll">
                 <table class="aot-table">
                   <thead>
@@ -97,8 +97,8 @@
                     <tr v-for="row in snapshot[p.id].rows" :key="row.key"
                       :class="['tr-' + row.key, { 'tr-indent': row.indent }]">
                       <td class="col-row" :class="{ 'td-indent': row.indent }">{{ row.label }}</td>
-                      <td class="col-num">{{ fmtCr(row.cy_rev) }}</td>
-                      <td class="col-num col-ly">{{ fmtCr(row.ly_rev) }}</td>
+                      <td class="col-num">{{ fmtRev(row.cy_rev) }}</td>
+                      <td class="col-num col-ly">{{ fmtRev(row.ly_rev) }}</td>
                       <td class="col-grw">
                         <span :class="['badge', growthClass(row.growth_rev)]">{{ growthLabel(row.growth_rev) }}</span>
                       </td>
@@ -164,13 +164,13 @@
             </span>
           </div>
           <div class="aot-table-card aot-perf-card">
-            <div class="aot-table-title">Brand Performance — B2C (₹ Cr)</div>
+            <div class="aot-table-title">Brand Performance — B2C</div>
             <div class="aot-table-scroll">
               <table class="aot-table aot-perf-table">
                 <thead>
                   <tr>
                     <th class="col-name">Brand</th>
-                    <th class="col-sales">Sales ₹Cr</th>
+                    <th class="col-sales">Sales</th>
                     <th class="col-grw">Grwth%</th>
                     <th class="col-qty">Units</th>
                     <th class="col-grw">Units%</th>
@@ -185,7 +185,7 @@
                   <tr v-for="(row, i) in brandData[activeBrandPeriod].rows" :key="row.name"
                     :class="{ 'perf-row-alt': i % 2 === 1 }">
                     <td class="col-name">{{ row.name }}</td>
-                    <td class="col-sales">{{ fmtCr(row.cy_sales) }}</td>
+                    <td class="col-sales">{{ fmtRev(row.cy_sales) }}</td>
                     <td class="col-grw"><span :class="['badge', growthClass(row.growth_sales)]">{{ growthLabel(row.growth_sales) }}</span></td>
                     <td class="col-qty">{{ fmtQty(row.cy_units) }}</td>
                     <td class="col-grw"><span :class="['badge', growthClass(row.growth_units)]">{{ growthLabel(row.growth_units) }}</span></td>
@@ -224,13 +224,13 @@
             </span>
           </div>
           <div class="aot-table-card aot-perf-card">
-            <div class="aot-table-title">Store Performance — All Customers (₹ Cr)</div>
+            <div class="aot-table-title">Store Performance — All Customers</div>
             <div class="aot-table-scroll">
               <table class="aot-table aot-perf-table">
                 <thead>
                   <tr>
                     <th class="col-name">Store</th>
-                    <th class="col-sales">Sales ₹Cr</th>
+                    <th class="col-sales">Sales</th>
                     <th class="col-grw">Grwth%</th>
                     <th class="col-qty">Units</th>
                     <th class="col-grw">Units%</th>
@@ -245,7 +245,7 @@
                   <tr v-for="(row, i) in storeData[activeStorePeriod].rows" :key="row.name"
                     :class="{ 'perf-row-alt': i % 2 === 1 }">
                     <td class="col-name">{{ row.name }}</td>
-                    <td class="col-sales">{{ fmtCr(row.cy_sales) }}</td>
+                    <td class="col-sales">{{ fmtRev(row.cy_sales) }}</td>
                     <td class="col-grw"><span :class="['badge', growthClass(row.growth_sales)]">{{ growthLabel(row.growth_sales) }}</span></td>
                     <td class="col-qty">{{ fmtQty(row.cy_units) }}</td>
                     <td class="col-grw"><span :class="['badge', growthClass(row.growth_units)]">{{ growthLabel(row.growth_units) }}</span></td>
@@ -334,20 +334,24 @@ const kpiCards = computed(() => {
   const b2c = row('b2c');
   const hv  = row('high_value');
   return [
-    { key: 'net_rev', label: 'Net Revenue',       value: fmtCr(net.cy_rev),  growth: net.growth_rev },
+    { key: 'net_rev', label: 'Net Revenue',       value: fmtRev(net.cy_rev),  growth: net.growth_rev },
     { key: 'net_qty', label: 'Net Qty',            value: fmtQty(net.cy_qty), growth: net.growth_qty },
-    { key: 'b2c_rev', label: 'B2C Revenue',        value: fmtCr(b2c.cy_rev),  growth: b2c.growth_rev },
+    { key: 'b2c_rev', label: 'B2C Revenue',        value: fmtRev(b2c.cy_rev),  growth: b2c.growth_rev },
     { key: 'b2c_qty', label: 'B2C Qty',            value: fmtQty(b2c.cy_qty), growth: b2c.growth_qty },
-    { key: 'hv_rev',  label: 'High Value Revenue', value: fmtCr(hv.cy_rev),   growth: hv.growth_rev },
+    { key: 'hv_rev',  label: 'High Value Revenue', value: fmtRev(hv.cy_rev),   growth: hv.growth_rev },
     { key: 'hv_qty',  label: 'High Value Qty',     value: fmtQty(hv.cy_qty),  growth: hv.growth_qty },
   ];
 });
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 
-function fmtCr(v) {
+function fmtRev(v) {
   if (v == null || isNaN(v)) return '—';
-  return '₹' + (v / 1e7).toFixed(2) + ' Cr';
+  const a = Math.abs(v);
+  if (a >= 1e7) return '₹' + (v / 1e7).toFixed(2) + ' Cr';
+  if (a >= 1e5) return '₹' + (v / 1e5).toFixed(2) + ' L';
+  if (a >= 1e3) return '₹' + (v / 1e3).toFixed(1) + ' K';
+  return '₹' + Math.round(v).toLocaleString('en-IN');
 }
 
 function fmtQty(v) {
