@@ -1,5 +1,6 @@
 {
- "creation": "2026-05-11 00:00:00.000000",
+ "actions": [],
+ "creation": "2026-05-11 00:00:00",
  "doctype": "DocType",
  "document_type": "Setup",
  "engine": "InnoDB",
@@ -22,11 +23,12 @@
    "label": "High Value Customers"
   },
   {
+   "allow_in_quick_entry": 1,
+   "description": "Customers matching these keywords are tagged as 'High Value'. Match type: Contains = name includes keyword (case-insensitive); Exact = full name match.",
    "fieldname": "high_end_customers",
    "fieldtype": "Table",
    "label": "High End Customers",
-   "options": "AOT High End Customer",
-   "description": "Customers matching these keywords are tagged as 'High Value'. Match type: Contains = name includes keyword (case-insensitive); Exact = full name match."
+   "options": "AOT High End Customer"
   },
   {
    "fieldname": "removed_customers_section",
@@ -34,11 +36,12 @@
    "label": "Excluded Customers"
   },
   {
+   "allow_in_quick_entry": 1,
+   "description": "Customers matching these keywords are hidden from all dashboard views and emails.",
    "fieldname": "removed_customers",
    "fieldtype": "Table",
    "label": "Exclude from Report",
-   "options": "AOT Removed Customer",
-   "description": "Customers matching these keywords are hidden from all dashboard views and emails."
+   "options": "AOT Removed Customer"
   },
   {
    "fieldname": "category_section",
@@ -46,11 +49,12 @@
    "label": "Category Mapping"
   },
   {
+   "allow_in_quick_entry": 1,
+   "description": "Maps ERPNext Item Groups to dashboard category labels (Watches / Accessories / Services). Only mapped item groups are included in the dashboard.",
    "fieldname": "category_mapping",
    "fieldtype": "Table",
    "label": "Category Mapping",
-   "options": "AOT Category Mapping",
-   "description": "Maps ERPNext Item Groups to dashboard category labels (Watches / Accessories / Services). Only mapped item groups are included in the dashboard."
+   "options": "AOT Category Mapping"
   },
   {
    "fieldname": "email_section",
@@ -58,18 +62,18 @@
    "label": "Email Settings"
   },
   {
+   "default": "AOT Sales Dashboard \u2013 {date}",
+   "description": "Use {date} as a placeholder for today's date.",
    "fieldname": "email_subject",
    "fieldtype": "Data",
-   "label": "Email Subject",
-   "default": "AOT Sales Dashboard – {date}",
-   "description": "Use {date} as a placeholder for today's date."
+   "label": "Email Subject"
   },
   {
+   "default": "08:00:00",
+   "description": "Time at which the daily dashboard email is sent.",
    "fieldname": "send_time",
    "fieldtype": "Time",
-   "label": "Send Time",
-   "default": "08:00:00",
-   "description": "Time at which the daily dashboard email is sent."
+   "label": "Send Time"
   },
   {
    "fieldname": "email_recipients",
@@ -80,7 +84,7 @@
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-05-11 00:00:00.000000",
+ "modified": "2026-05-15 16:02:05.785251",
  "modified_by": "Administrator",
  "module": "Aetas Customization",
  "name": "AOT Dashboard Config",
@@ -88,18 +92,16 @@
  "permissions": [
   {
    "create": 1,
-   "delete": 0,
    "email": 1,
-   "export": 1,
    "print": 1,
    "read": 1,
-   "report": 1,
    "role": "System Manager",
    "share": 1,
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
- "title_field": ""
+ "states": []
 }
