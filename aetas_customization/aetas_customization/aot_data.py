@@ -145,7 +145,6 @@ def fetch_rows(start_date, end_date, config):
         FROM `tabSales Invoice` si
         JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
         WHERE si.docstatus = 1
-          AND si.is_return  = 0
           AND si.posting_date BETWEEN %(start_date)s AND %(end_date)s
         GROUP BY si.customer, sii.item_group, sii.brand, sii.cost_center
         ORDER BY si.customer
@@ -318,7 +317,6 @@ def debug_category_breakdown(start_date=None, end_date=None):
         FROM `tabSales Invoice` si
         JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
         WHERE si.docstatus = 1
-          AND si.is_return  = 0
           AND si.posting_date BETWEEN %(start_date)s AND %(end_date)s
         GROUP BY sii.item_group
         ORDER BY base_net_amount DESC
