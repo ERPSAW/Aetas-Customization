@@ -39,8 +39,8 @@ class AetasAdvancePaymentReceipt(Document):
 			if duplicate_name:
 				frappe.throw(_("UTR No must be unique for the same customer."))
 
-		if self.status == "Received" and not self.payment_entry:
-			frappe.throw(_("Payment Entry is required when status is Received."))
+		#if self.status == "Received" and not self.payment_entry:
+			#frappe.throw(_("Payment Entry is required when status is Received."))
 
 	def calculate_total_paid(self):
 		"""Update self.total_paid based on submitted Payment Entries."""
