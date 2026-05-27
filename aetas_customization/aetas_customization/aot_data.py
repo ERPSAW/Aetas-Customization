@@ -652,29 +652,34 @@ def _generate_excel(snapshot_data, brand_data, store_data):
 
 
 def _email_html(snapshot_data):
-    daily  = snapshot_data.get('daily', {})
-    rows   = daily.get('rows', [])
-    cy_col = daily.get('cy_col', 'CY')
-    ly_col = daily.get('ly_col', 'LY')
+    def fmt_rev(v):
+        if v is None: return '—'
+        a = abs(v)
+        if a >= 1e7: return f'₹{v/1e7:.2f} Cr'
+        if a >= 1e5: return f'₹{v/1e5:.2f} L'
+        if a >= 1e3: return f'₹{v/1e3:.1f} K'
+        return f'₹{round(v):,}'
 
-    def cr(v):  return '—' if v is None else f'₹{v/1e7:.2f} Cr'
     def pct(v): return '—' if v is None else f"{'▲' if v >= 0 else '▼'} {abs(v*100):.1f}%"
     def clr(v): return '#16a34a' if (v or 0) >= 0 else '#dc2626'
 
-    body = ''.join(f"""
+    def _section(period_key, heading):
+        pd     = snapshot_data.get(period_key, {})
+        rows   = pd.get('rows', [])
+        cy_col = pd.get('cy_col', 'CY')
+        ly_col = pd.get('ly_col', 'LY')
+        body   = ''.join(f"""
       <tr>
         <td style="padding:6px 12px;{'padding-left:24px;color:#64748b' if r['indent'] else 'font-weight:600'}">{r['label']}</td>
-        <td style="padding:6px 12px;text-align:right">{cr(r['cy_rev'])}</td>
-        <td style="padding:6px 12px;text-align:right;color:#64748b">{cr(r['ly_rev'])}</td>
+        <td style="padding:6px 12px;text-align:right">{fmt_rev(r['cy_rev'])}</td>
+        <td style="padding:6px 12px;text-align:right;color:#64748b">{fmt_rev(r['ly_rev'])}</td>
         <td style="padding:6px 12px;text-align:right;color:{clr(r['growth_rev'])}">{pct(r['growth_rev'])}</td>
         <td style="padding:6px 12px;text-align:right">{r['cy_qty']:,}</td>
         <td style="padding:6px 12px;text-align:right;color:{clr(r['growth_qty'])}">{pct(r['growth_qty'])}</td>
       </tr>""" for r in rows)
-
-    return f"""<html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#1e293b;max-width:700px;margin:auto">
-<h2 style="color:#0f172a">AOT Sales Dashboard — {date.today().strftime('%-d %b %Y')}</h2>
-<h3 style="color:#334155;margin-bottom:4px">Daily Snapshot</h3>
-<p style="color:#64748b;margin-top:0">{daily.get('cy_label','')} vs {daily.get('ly_label','')}</p>
+        return f"""
+<h3 style="color:#334155;margin-bottom:4px;margin-top:28px">{heading}</h3>
+<p style="color:#64748b;margin-top:0">{pd.get('cy_label','')} vs {pd.get('ly_label','')}</p>
 <table cellspacing="0" style="border-collapse:collapse;font-size:13px;width:100%">
   <thead><tr style="background:#1e293b;color:#fff">
     <th style="padding:8px 12px;text-align:left">Row</th>
@@ -685,7 +690,12 @@ def _email_html(snapshot_data):
     <th style="padding:8px 12px;text-align:right">Qty Grwth</th>
   </tr></thead>
   <tbody>{body}</tbody>
-</table>
+</table>"""
+
+    return f"""<html><body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#1e293b;max-width:700px;margin:auto">
+<h2 style="color:#0f172a">AOT Sales Dashboard — {date.today().strftime('%-d %b %Y')}</h2>
+{_section('daily', 'Daily Snapshot')}
+{_section('mtd',   'MTD Snapshot')}
 <p style="color:#94a3b8;font-size:12px;margin-top:20px">Full data attached as Excel (3 sheets: Snapshot, Brand Summary, Store Summary).</p>
 </body></html>"""
 
