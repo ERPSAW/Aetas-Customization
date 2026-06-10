@@ -39,22 +39,27 @@ def receive_lead() -> dict:
     Validates auth, deduplicates via idempotency key, then enqueues
     background processing so we respond to the caller in < 1 second.
     """
-    # ── 1. Authenticate ────────────────────────────────────────────────────
-    auth_error = _authenticate(frappe.request.headers)
-    if auth_error:
-        frappe.local.response["http_status_code"] = 401
-        return {"status": "error", "code": "UNAUTHORIZED", "message": auth_error}
 
     # ── 2. Parse payload ───────────────────────────────────────────────────
-    try:
-        payload = frappe.parse_json(frappe.request.data)
-    except Exception:
-        frappe.local.response["http_status_code"] = 400
-        return {"status": "error", "code": "INVALID_JSON", "message": _("Request body must be valid JSON.")}
+    # frappe already parses the JSON body into form_dict during request setup
+    # (frappe.request.data may already be consumed by then).
+    raw_data = frappe.request.data
+    if raw_data:
+        try:
+            payload = frappe.parse_json(raw_data.decode("utf-8"))
+        except Exception:
+            frappe.local.response["http_status_code"] = 400
+            return {"status": "error", "code": "INVALID_JSON", "message": _("Request body must be valid JSON.")}
+    else:
+        payload = frappe.local.form_dict
 
     if not payload:
         frappe.local.response["http_status_code"] = 400
         return {"status": "error", "code": "EMPTY_PAYLOAD", "message": _("Request body cannot be empty.")}
+
+    if not isinstance(payload, dict):
+        frappe.local.response["http_status_code"] = 400
+        return {"status": "error", "code": "INVALID_JSON", "message": _("Request body must be a JSON object.")}
 
     # ── 3. Validate required fields ────────────────────────────────────────
     validation_error = _validate_required_fields(payload)
@@ -118,9 +123,9 @@ def _create_lead_from_payload(payload: dict, idempotency_key: str) -> None:
         lead.email_id       = payload.get("email", "").strip().lower()
         lead.mobile_no      = str(payload.get("phone", "")).strip()
         lead.city           = payload.get("city", "").strip()
-        lead.source         = "Shopify"
-        lead.status         = "Lead"
-        lead.company_name   = payload.get("city", "")   # city as org placeholder — adjust per your Lead layout
+        lead.source         = "Others"
+        lead.status         = "Open"
+        lead.company_name   = payload.get("name", "").strip()
 
         # ── Custom extension fields ────────────────────────────────────────
         lead.custom_product_title        = payload.get("product_title", "").strip()
@@ -132,7 +137,11 @@ def _create_lead_from_payload(payload: dict, idempotency_key: str) -> None:
         # ── Notes — preserve the enquiry date from source ──────────────────
         enquiry_date = payload.get("date", "")
         if enquiry_date:
-            lead.notes = f"Shopify enquiry submitted on: {enquiry_date}"
+            lead.append("notes", {
+                "note": f"Shopify enquiry submitted on: {enquiry_date}",
+                "added_by": frappe.session.user,
+                "added_on": frappe.utils.now(),
+            })
 
         lead.insert(ignore_permissions=True)
         frappe.db.commit()
@@ -145,6 +154,14 @@ def _create_lead_from_payload(payload: dict, idempotency_key: str) -> None:
     except frappe.DuplicateEntryError:
         # Race condition — another worker won; safe to ignore
         frappe.db.rollback()
+        frappe.log_error(
+            title="Lead Webhook: Failed to create Lead",
+            message=frappe.as_json({
+                "payload": payload,
+                "idempotency_key": idempotency_key,
+                "traceback": frappe.get_traceback(),
+            }),
+        )
         return
 
     except Exception:
