@@ -123,7 +123,7 @@ def _create_lead_from_payload(payload: dict, idempotency_key: str) -> None:
         lead.email_id       = payload.get("email", "").strip().lower()
         lead.mobile_no      = str(payload.get("phone", "")).strip()
         lead.city           = payload.get("city", "").strip()
-        lead.source         = "Others"
+        lead.source         = "6. Online - AOT Website/Shopify"
         lead.status         = "Open"
         lead.company_name   = payload.get("name", "").strip()
 
