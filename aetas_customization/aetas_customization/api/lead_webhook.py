@@ -31,7 +31,7 @@ from frappe import _
 # Public entry point — allow_guest=True because external systems call this
 # ---------------------------------------------------------------------------
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def receive_lead() -> dict:
     """
     POST /api/method/aetas_customization.aetas_customization.api.lead_webhook.receive_lead
@@ -143,7 +143,7 @@ def _create_lead_from_payload(payload: dict, idempotency_key: str) -> None:
                 "added_on": frappe.utils.now(),
             })
 
-        lead.insert(ignore_permissions=True)
+        lead.insert(ignore_permissions=True, ignore_mandatory=True,)
         frappe.db.commit()
 
         frappe.logger().info(
