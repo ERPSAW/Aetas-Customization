@@ -26,7 +26,7 @@ def get_data(filters):
 		# creation is datetime, convert date → full range
 		sn_filters["creation"] = ["between", (f"{from_date} 00:00:00", f"{to_date} 23:59:59")]
 
-	serial_nos = frappe.db.get_all("Serial No", filters=sn_filters, fields=['*'])
+	serial_nos = frappe.db.get_all("Serial No", filters=sn_filters, fields=['*'], order_by="creation asc")
 
 	if not serial_nos:
 		return data
