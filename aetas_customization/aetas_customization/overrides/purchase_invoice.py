@@ -106,7 +106,11 @@ def on_submit(self, method):
 
         # Serial nos received through a Stock Entry keep that Stock Entry in
         # purchase_document_no, so store the Purchase Invoice raised against
-        # them separately.
+        # them separately. A return is also a Purchase Invoice, but stamping it
+        # would wipe out the original invoice.
+        if self.is_return:
+            continue
+
         frappe.db.sql("""
             UPDATE `tabSerial No`
             SET custom_purchase_invoice_no = %(purchase_invoice)s
@@ -120,6 +124,9 @@ def on_submit(self, method):
 
 
 def on_cancel(self, method):
+    if self.is_return:
+        return
+
     for item in self.items:
         serial_numbers = get_serial_nos_for_item(item)
         if not serial_numbers:
