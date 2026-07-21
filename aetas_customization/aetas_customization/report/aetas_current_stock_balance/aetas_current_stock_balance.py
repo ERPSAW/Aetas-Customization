@@ -58,16 +58,12 @@ def get_data(filters):
 		# -------------------------
 
 		# 1) PURCHASE INVOICE → PAID
-		pi_exists = frappe.db.exists(
-			"Purchase Invoice Item",
-			{
-				"item_code": item_code,
-				"serial_no": ["like", f"%{sn}%"],
-				"docstatus": 1,
-			},
-		)
+		# custom_purchase_invoice_no is stamped on the Serial No when a Purchase
+		# Invoice is submitted against it (see overrides/purchase_invoice.py),
+		# so no lookup into Purchase Invoice Item is needed.
+		purchase_invoice = serial_no.get("custom_purchase_invoice_no")
 
-		if pi_exists:
+		if purchase_invoice:
 			status = "Paid"
 
 		# 2) STOCK ENTRY → MATERIAL RECEIPT → CONSIGNMENT → PAID
@@ -116,21 +112,23 @@ def get_data(filters):
 				purchase_rate = row.basic_rate or 0
 				mrp = row.custom_mrp or 0
 
-			# 2) PURCHASE INVOICE ITEM (only if still not found)
-			if not mrp:
-				row = frappe.db.get_value(
-					"Purchase Invoice Item",
-					{
-						"parent": doc_no,
-						"item_code": item_code,
-						"serial_no": ["like", f"%{sn}%"]
-					},
-					["net_rate", "mrp"],
-					as_dict=True
-				)
-				if row:
-					purchase_rate = row.net_rate or 0
-					mrp = row.mrp or 0
+		# 2) PURCHASE INVOICE ITEM (only if still not found).
+		# Keyed on custom_purchase_invoice_no, not purchase_document_no — when the
+		# serial was received through a Stock Entry, purchase_document_no holds
+		# that Stock Entry and can never match a Purchase Invoice Item.
+		if not mrp and purchase_invoice:
+			row = frappe.db.get_value(
+				"Purchase Invoice Item",
+				{
+					"parent": purchase_invoice,
+					"item_code": item_code,
+				},
+				["net_rate", "mrp"],
+				as_dict=True
+			)
+			if row:
+				purchase_rate = row.net_rate or 0
+				mrp = row.mrp or 0
 
 		#3) FALLBACK — ITEM MASTER MRP
 		if not mrp:
