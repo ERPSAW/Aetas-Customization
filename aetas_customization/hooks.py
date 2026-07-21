@@ -196,6 +196,7 @@ doc_events = {
     "Purchase Invoice": {
         "before_validate": "aetas_customization.aetas_customization.overrides.purchase_invoice.before_validate",
         "on_submit": "aetas_customization.aetas_customization.overrides.purchase_invoice.on_submit",
+        "on_cancel": "aetas_customization.aetas_customization.overrides.purchase_invoice.on_cancel",
     },
     "Sales Invoice": {
         "before_validate": "aetas_customization.test_setup.ensure_sales_invoice_mandatory_fields_for_tests",
