@@ -46,11 +46,69 @@ fixtures = [
                     "Customer-custom_customer_journey",
                     "Sales Invoice-custom_boutique",
                     "Lead-custom_product_title", "Lead-custom_model_reference", "Lead-custom_product_price", "Lead-custom_page_url",
-                    "Lead-custom_webhook_idempotency", "Lead-custom_column_break_6dqz1", "Lead-custom_section_break_7yt77"
+                    "Lead-custom_webhook_idempotency", "Lead-custom_column_break_6dqz1", "Lead-custom_section_break_7yt77",
+                    "Brand-custom_sales_persons",
+                    "Brand-custom_last_assigned_sales_person",
+                    "Lead-custom_probability",
+                    "Lead-custom_campaign_id",
+                    "Lead-custom_lost_reason",
+                    "Lead-custom_contact_attempts",
+                    "Lead-custom_allocated_store",
+                    "Brand-custom_last_assigned_sales_person",
+                    "Brand-custom_sales_persons",
+                    "Lead-custom_unqualified_reason",
                 ],
             ]
         ],
     },
+    # NOTE: masters (Role / Workflow State / Workflow Action Master) must import
+    # BEFORE the Workflow that references them.
+    {
+        "dt": "Role",
+        "filters": [["name", "in", ["Lead User"]]],
+    },
+    {
+        "dt": "Workflow State",
+        "filters": [
+            [
+                "name",
+                "in",
+                [
+                    "Open",
+                    "Follow Up",
+                    "In Progress",
+                    "Qualified",
+                    "Prospecting",
+                    "Visit Planned",
+                    "Lead Allocation",
+                    "Closed Won",
+                    "Closed Lost",
+                    "Unqualified",
+                ],
+            ]
+        ],
+    },
+    {
+        "dt": "Workflow Action Master",
+        "filters": [
+            [
+                "name",
+                "in",
+                [
+                    "Mark Contacted",
+                    "Not Contacted",
+                    "Qualify",
+                    "Start Prospecting",
+                    "Plan Visit",
+                    "Allocate",
+                    "Close Won",
+                    "Close Lost",
+                    "Mark Unqualified",
+                ],
+            ]
+        ],
+    },
+    {"dt": "Workflow", "filters": [["name", "in", ["Lead Pipeline"]]]},
     {
         "dt": "Property Setter",
         "filters": [
@@ -65,6 +123,8 @@ fixtures = [
                     "Lead-type-options",
                     "Lead-status-options",
                     "Lead-status-default",
+                    "Lead-status-hidden",
+                    "Lead-workflow_state-read_only",
                     "Lead-customer-depends_on",
                     "Lead-contact_info_tab-hidden",
                     "Lead-organization_section-hidden",
@@ -118,7 +178,7 @@ doctype_js = {
     "Purchase Order": "custom_scripts/js/purchase_order.js",
     "Lead": "custom_scripts/js/lead.js",
 }
-# doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
+doctype_list_js = {"Lead": "custom_scripts/js/lead_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
 
@@ -241,9 +301,11 @@ doc_events = {
 
 # hooks.py
 
-# after_migrate = [
-#     "aetas_customization.aetas_customization.overrides.utils.update_customer_journeys"
-# ]
+# Runs after fixtures sync — backfills pipeline state + ensures CRM settings.
+after_migrate = [
+    "aetas_customization.lead.backfill.backfill_lead_pipeline_state",
+    "aetas_customization.lead.backfill.ensure_lead_crm_settings",
+]
 
 # Scheduled Tasks
 # ---------------
