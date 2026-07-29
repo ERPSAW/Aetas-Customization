@@ -68,20 +68,76 @@ def before_validate(self, method):
         raise
 
           
+def get_serial_nos_for_item(item):
+    """Serial nos of a Purchase Invoice Item, from the bundle (v15) or the plain field."""
+    serial_numbers = []
+
+    if item.get("serial_and_batch_bundle"):
+        serial_numbers = frappe.get_all(
+            "Serial and Batch Entry",
+            filters={"parent": item.serial_and_batch_bundle},
+            pluck="serial_no",
+        )
+
+    if not serial_numbers and item.get("serial_no"):
+        serial_numbers = item.serial_no.split("\n")
+
+    return [sn.strip() for sn in serial_numbers if sn and sn.strip()]
+
+
 def on_submit(self, method):
     for item in self.items:
-        if item.serial_no:
-            serial_numbers = item.serial_no.split("\n")
+        serial_numbers = get_serial_nos_for_item(item)
+        if not serial_numbers:
+            continue
 
-            frappe.db.sql("""
-                UPDATE `tabSerial No`
-                SET mrp = %(mrp)s
-                WHERE name IN %(serial_numbers)s
-                AND item_code = %(item_code)s
-                AND warehouse = %(warehouse)s
-            """, {
-                'mrp': item.mrp,
-                'serial_numbers': serial_numbers,
-                'item_code': item.item_code,
-                'warehouse':item.warehouse
-            })
+        frappe.db.sql("""
+            UPDATE `tabSerial No`
+            SET mrp = %(mrp)s
+            WHERE name IN %(serial_numbers)s
+            AND item_code = %(item_code)s
+            AND warehouse = %(warehouse)s
+        """, {
+            'mrp': item.mrp,
+            'serial_numbers': serial_numbers,
+            'item_code': item.item_code,
+            'warehouse':item.warehouse
+        })
+
+        # Serial nos received through a Stock Entry keep that Stock Entry in
+        # purchase_document_no, so store the Purchase Invoice raised against
+        # them separately. A return is also a Purchase Invoice, but stamping it
+        # would wipe out the original invoice.
+        if self.is_return:
+            continue
+
+        frappe.db.sql("""
+            UPDATE `tabSerial No`
+            SET custom_purchase_invoice_no = %(purchase_invoice)s
+            WHERE name IN %(serial_numbers)s
+            AND item_code = %(item_code)s
+        """, {
+            'purchase_invoice': self.name,
+            'serial_numbers': serial_numbers,
+            'item_code': item.item_code,
+        })
+
+
+def on_cancel(self, method):
+    if self.is_return:
+        return
+
+    for item in self.items:
+        serial_numbers = get_serial_nos_for_item(item)
+        if not serial_numbers:
+            continue
+
+        frappe.db.sql("""
+            UPDATE `tabSerial No`
+            SET custom_purchase_invoice_no = NULL
+            WHERE name IN %(serial_numbers)s
+            AND custom_purchase_invoice_no = %(purchase_invoice)s
+        """, {
+            'purchase_invoice': self.name,
+            'serial_numbers': serial_numbers,
+        })

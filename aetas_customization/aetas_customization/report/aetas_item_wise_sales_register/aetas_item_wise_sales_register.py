@@ -265,17 +265,23 @@ def get_purchase_rate(data):
 	invoices = list({inv for inv, _ in invoice_item_pairs})
 
 	sle_rate_map = {}
+	# COGS (Cost of Goods Sold) amount, GST excluded, per invoice + item.
+	# `stock_value_difference` is the total value of stock that left on the sale
+	# (valuation_rate * qty). On a sale it is negative, so we take ABS().
+	# Stock valuation never includes GST, so this is already tax-free.
+	sle_cogs_map = {}
 
 	if invoices:
 		sle_data = frappe.db.sql("""
-			SELECT 
+			SELECT
 				item_code,
 				voucher_no,
-				CASE 
+				CASE
 					WHEN valuation_rate > 0 THEN valuation_rate
 					WHEN incoming_rate > 0 THEN incoming_rate
 					ELSE 0
-				END AS rate
+				END AS rate,
+				stock_value_difference
 			FROM `tabStock Ledger Entry`
 			WHERE voucher_type = 'Sales Invoice'
 				AND voucher_no IN %(invoices)s
@@ -287,6 +293,9 @@ def get_purchase_rate(data):
 			key = (row.voucher_no, row.item_code)
 			if key not in sle_rate_map:
 				sle_rate_map[key] = row.rate
+			# Sum COGS across all SLE rows for this invoice+item
+			# (a single sale line can produce multiple ledger entries).
+			sle_cogs_map[key] = sle_cogs_map.get(key, 0) + abs(flt(row.stock_value_difference))
 
 	# ============================================================
 	# ASSIGN BACK VALUES
@@ -304,8 +313,15 @@ def get_purchase_rate(data):
 		if serial_no:
 			sn = serial_no.replace("\n", ",").split(",")[0].strip()
 
-		# ---------------- PURCHASE RATE ----------------
-		if sn:
+		# ---------------- PURCHASE RATE (COGS, GST excluded) ----------------
+		# Total Cost of Goods Sold for this invoice + item line, taken from the
+		# Stock Ledger Entry (valuation_rate * qty). Stock valuation never
+		# includes GST, so this amount is already tax-free.
+		# Fallback: old per-unit rate logic, then Item master MRP.
+		cogs = sle_cogs_map.get((invoice, item_code))
+		if cogs:
+			d["purchase_rate"] = cogs
+		elif sn:
 			d["purchase_rate"] = serial_rate_map.get((item_code, sn), item_mrp_cache.get(item_code))
 		else:
 			d["purchase_rate"] = sle_rate_map.get((invoice, item_code), item_mrp_cache.get(item_code))
