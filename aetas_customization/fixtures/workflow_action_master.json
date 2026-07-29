@@ -1,0 +1,65 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-07-29 12:54:05.861068",
+  "name": "Mark Contacted",
+  "workflow_action_name": "Mark Contacted"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-07-29 12:54:05.873787",
+  "name": "Not Contacted",
+  "workflow_action_name": "Not Contacted"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-07-29 12:54:05.885573",
+  "name": "Qualify",
+  "workflow_action_name": "Qualify"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-07-29 12:54:05.897870",
+  "name": "Start Prospecting",
+  "workflow_action_name": "Start Prospecting"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-07-29 12:54:05.910333",
+  "name": "Plan Visit",
+  "workflow_action_name": "Plan Visit"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-07-29 12:54:05.921784",
+  "name": "Allocate",
+  "workflow_action_name": "Allocate"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-07-29 12:54:05.935542",
+  "name": "Close Won",
+  "workflow_action_name": "Close Won"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-07-29 12:54:05.948632",
+  "name": "Close Lost",
+  "workflow_action_name": "Close Lost"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow Action Master",
+  "modified": "2026-07-29 12:54:05.960180",
+  "name": "Mark Unqualified",
+  "workflow_action_name": "Mark Unqualified"
+ }
+]

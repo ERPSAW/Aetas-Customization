@@ -1,0 +1,92 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": null,
+  "modified": "2026-07-29 12:54:06.003271",
+  "name": "Open",
+  "style": "Primary",
+  "workflow_state_name": "Open"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": null,
+  "modified": "2026-07-29 12:54:06.016376",
+  "name": "Follow Up",
+  "style": "Warning",
+  "workflow_state_name": "Follow Up"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": null,
+  "modified": "2026-07-29 12:54:06.030709",
+  "name": "In Progress",
+  "style": "Warning",
+  "workflow_state_name": "In Progress"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": null,
+  "modified": "2026-07-29 12:54:06.042357",
+  "name": "Qualified",
+  "style": "Info",
+  "workflow_state_name": "Qualified"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": null,
+  "modified": "2026-07-29 12:54:06.053073",
+  "name": "Prospecting",
+  "style": "Info",
+  "workflow_state_name": "Prospecting"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": null,
+  "modified": "2026-07-29 12:54:06.063974",
+  "name": "Visit Planned",
+  "style": "Info",
+  "workflow_state_name": "Visit Planned"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": null,
+  "modified": "2026-07-29 12:54:06.074953",
+  "name": "Lead Allocation",
+  "style": "Warning",
+  "workflow_state_name": "Lead Allocation"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": null,
+  "modified": "2026-07-29 12:54:06.085637",
+  "name": "Closed Won",
+  "style": "Success",
+  "workflow_state_name": "Closed Won"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": null,
+  "modified": "2026-07-29 12:54:06.096885",
+  "name": "Closed Lost",
+  "style": "Danger",
+  "workflow_state_name": "Closed Lost"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": null,
+  "modified": "2026-07-29 12:54:06.107954",
+  "name": "Unqualified",
+  "style": "Danger",
+  "workflow_state_name": "Unqualified"
+ }
+]

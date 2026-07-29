@@ -123,9 +123,23 @@ def _create_lead_from_payload(payload: dict, idempotency_key: str) -> None:
         lead.email_id       = payload.get("email", "").strip().lower()
         lead.mobile_no      = str(payload.get("phone", "")).strip()
         lead.city           = payload.get("city", "").strip()
-        lead.source         = "6. Online - AOT Website/Shopify"
+        lead.source         = _resolve_source(payload.get("source"))
         lead.status         = "Open"
         lead.company_name   = payload.get("name", "").strip()
+
+        # ── Brand + campaign — drive assignment (see lead/assignment.py) ────
+        # Only set the brand link if it resolves to a real Brand; otherwise leave
+        # it blank so the assignment engine flags the lead for manual pickup.
+        brand = (payload.get("brand") or "").strip()
+        if brand and frappe.db.exists("Brand", brand):
+            lead.custom_brand = brand
+        elif brand:
+            frappe.logger("lead_webhook").info(
+                f"Webhook lead: unknown brand '{brand}' — left blank for manual pickup."
+            )
+        lead.custom_campaign_id = (
+            payload.get("campaign_id") or payload.get("campaign") or ""
+        ).strip()
 
         # ── Custom extension fields ────────────────────────────────────────
         lead.custom_product_title        = payload.get("product_title", "").strip()
@@ -211,6 +225,19 @@ def _authenticate(headers: dict) -> str | None:
         return _("Invalid Bearer token.")
 
     return None
+
+
+def _resolve_source(raw_source: object) -> str:
+    """Map a payload source to an existing Lead Source, falling back to 'Others'.
+
+    Lead.source is a Link to the Lead Source master, so we can only assign values
+    that already exist as Lead Source records; anything unknown falls back to
+    'Others' (the pre-existing default).
+    """
+    source = str(raw_source or "").strip()
+    if source and frappe.db.exists("Lead Source", source):
+        return source
+    return "Others"
 
 
 def _validate_required_fields(payload: dict) -> str | None:

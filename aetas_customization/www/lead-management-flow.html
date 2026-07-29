@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead Management Flow</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  :root {
+    --paper: #f6f3ee;
+    --surface: #fefcf9;
+    --surface-2: #f1ece3;
+    --ink: #201d1a;
+    --muted: #6b6560;
+    --faint: #e7e1d8;
+    --hair: #ddd5c8;
+    --accent: #9a7343;
+    --accent-ink: #7c5b32;
+    --accent-soft: #f0e7d9;
+    --won: #3c6e57;
+    --won-soft: #e3ede7;
+    --lost: #9a4632;
+    --lost-soft: #f1e2dc;
+    --warn: #9c7420;
+    --warn-soft: #efe6d0;
+    --shadow: 0 1px 2px rgba(32,29,26,.05), 0 8px 24px -12px rgba(32,29,26,.18);
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: "SF Mono", SFMono-Regular, ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #17161a;
+      --surface: #201e23;
+      --surface-2: #26242a;
+      --ink: #ece7df;
+      --muted: #a39b90;
+      --faint: #322f37;
+      --hair: #3a3640;
+      --accent: #c79a63;
+      --accent-ink: #d9b585;
+      --accent-soft: #2b2419;
+      --won: #74b391;
+      --won-soft: #1c2b23;
+      --lost: #d98069;
+      --lost-soft: #2e1f1a;
+      --warn: #d6a84e;
+      --warn-soft: #2b2415;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -14px rgba(0,0,0,.7);
+    }
+  }
+  :root[data-theme="light"] {
+    --paper: #f6f3ee; --surface: #fefcf9; --surface-2: #f1ece3; --ink: #201d1a;
+    --muted: #6b6560; --faint: #e7e1d8; --hair: #ddd5c8; --accent: #9a7343;
+    --accent-ink: #7c5b32; --accent-soft: #f0e7d9; --won: #3c6e57; --won-soft: #e3ede7;
+    --lost: #9a4632; --lost-soft: #f1e2dc; --warn: #9c7420; --warn-soft: #efe6d0;
+    --shadow: 0 1px 2px rgba(32,29,26,.05), 0 8px 24px -12px rgba(32,29,26,.18);
+  }
+  :root[data-theme="dark"] {
+    --paper: #17161a; --surface: #201e23; --surface-2: #26242a; --ink: #ece7df;
+    --muted: #a39b90; --faint: #322f37; --hair: #3a3640; --accent: #c79a63;
+    --accent-ink: #d9b585; --accent-soft: #2b2419; --won: #74b391; --won-soft: #1c2b23;
+    --lost: #d98069; --lost-soft: #2e1f1a; --warn: #d6a84e; --warn-soft: #2b2415;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -14px rgba(0,0,0,.7);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  .wrap {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: clamp(1.5rem, 4vw, 4rem) clamp(1.15rem, 4vw, 3rem) 4rem;
+  }
+
+  /* ---------- typographic primitives ---------- */
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: .72rem;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    color: var(--accent-ink);
+    margin: 0;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(2.2rem, 6vw, 3.4rem);
+    line-height: 1.05;
+    letter-spacing: -.01em;
+    text-wrap: balance;
+    margin: .5rem 0 0;
+  }
+  h2 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(1.4rem, 3vw, 1.8rem);
+    letter-spacing: -.01em;
+    text-wrap: balance;
+    margin: 0;
+  }
+  h3 {
+    font-family: var(--sans);
+    font-weight: 650;
+    font-size: 1.02rem;
+    letter-spacing: .01em;
+    margin: 0;
+  }
+  p { margin: 0; }
+  .lead-in {
+    font-family: var(--serif);
+    font-size: clamp(1.05rem, 2.3vw, 1.3rem);
+    line-height: 1.5;
+    color: var(--ink);
+    max-width: 40ch;
+  }
+
+  /* ---------- hero ---------- */
+  .hero { padding-bottom: 2rem; border-bottom: 1px solid var(--hair); }
+  .hero-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem 2.5rem;
+    margin-top: 2rem;
+  }
+  .meta-item { display: flex; flex-direction: column; gap: .2rem; }
+  .meta-item .k {
+    font-family: var(--mono);
+    font-size: .68rem;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .meta-item .v { font-size: .95rem; font-weight: 550; }
+  .pill-status {
+    display: inline-flex; align-items: center; gap: .5rem;
+    align-self: flex-start;
+    font-family: var(--mono);
+    font-size: .7rem; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--accent-ink);
+    background: var(--accent-soft);
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    padding: .35rem .7rem; border-radius: 100px;
+  }
+  .pill-status::before {
+    content: ""; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent);
+  }
+
+  /* ---------- section scaffolding ---------- */
+  section { margin-top: clamp(2.75rem, 6vw, 4rem); }
+  .sec-head { display: flex; align-items: baseline; gap: .9rem; margin-bottom: 1.5rem; }
+  .sec-num {
+    font-family: var(--mono); font-size: .8rem; color: var(--accent);
+    font-weight: 600; letter-spacing: .05em;
+  }
+  .sec-sub { color: var(--muted); max-width: 62ch; margin-top: .5rem; }
+
+  /* ---------- principle chips ---------- */
+  .principles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 1px;
+    background: var(--hair);
+    border: 1px solid var(--hair);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .principle {
+    background: var(--surface);
+    padding: 1.25rem 1.3rem 1.4rem;
+    display: flex; flex-direction: column; gap: .5rem;
+  }
+  .principle .idx {
+    font-family: var(--mono); font-size: .7rem; letter-spacing: .1em;
+    color: var(--accent); text-transform: uppercase;
+  }
+  .principle .t { font-family: var(--serif); font-size: 1.15rem; font-weight: 600; }
+  .principle .d { font-size: .88rem; color: var(--muted); line-height: 1.5; }
+
+  /* ---------- lifecycle journey ---------- */
+  .journey { display: flex; flex-direction: column; }
+  .node {
+    display: grid;
+    grid-template-columns: 96px 1fr;
+    gap: 1.25rem;
+    position: relative;
+  }
+  .rail { display: flex; flex-direction: column; align-items: center; }
+  /* connecting line behind the badges */
+  .rail::before {
+    content: ""; position: absolute; top: 0; bottom: 0;
+    left: 47px; width: 2px; background: var(--hair);
+  }
+  .node:first-child .rail::before { top: 24px; }
+  .node:last-child .rail::before { bottom: calc(100% - 24px); }
+  .badge {
+    position: relative; z-index: 1;
+    width: 62px; height: 62px; border-radius: 50%;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: var(--surface); border: 2px solid var(--accent);
+    color: var(--accent-ink); box-shadow: var(--shadow);
+    flex: none;
+  }
+  .badge .pct { font-family: var(--mono); font-weight: 650; font-size: 1.05rem; letter-spacing: -.02em; }
+  .badge .pct.small { font-size: .72rem; letter-spacing: .04em; }
+  .badge.start { background: var(--accent); border-color: var(--accent); color: #fff; }
+  :root[data-theme="dark"] .badge.start,
+  .badge.start { color: #fff; }
+  @media (prefers-color-scheme: dark) { .badge.start { color: #1a1712; } }
+  :root[data-theme="dark"] .badge.start { color: #1a1712; }
+  :root[data-theme="light"] .badge.start { color: #fff; }
+  .badge.won { border-color: var(--won); color: var(--won); }
+  .badge.lost { border-color: var(--lost); color: var(--lost); }
+
+  .node-body {
+    padding-bottom: 2rem;
+    display: flex; flex-direction: column; gap: .55rem;
+    min-width: 0;
+  }
+  .node:last-child .node-body { padding-bottom: 0; }
+  .node-head { display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; }
+  .stage-name {
+    font-family: var(--serif); font-size: 1.2rem; font-weight: 600; letter-spacing: -.01em;
+  }
+  .tag {
+    font-family: var(--mono); font-size: .64rem; letter-spacing: .12em; text-transform: uppercase;
+    padding: .22rem .5rem; border-radius: 5px; white-space: nowrap;
+  }
+  .tag.auto { background: var(--surface-2); color: var(--muted); border: 1px solid var(--hair); }
+  .tag.desk { background: var(--accent-soft); color: var(--accent-ink); }
+  .node-desc { color: var(--muted); font-size: .92rem; max-width: 60ch; }
+
+  /* branch offshoots */
+  .branch {
+    margin-top: .35rem;
+    border-left: 2px dashed var(--hair);
+    padding: .1rem 0 .1rem 1rem;
+    display: flex; flex-direction: column; gap: .55rem;
+  }
+  .offshoot {
+    background: var(--surface); border: 1px solid var(--hair); border-radius: 10px;
+    padding: .8rem .95rem; display: flex; flex-direction: column; gap: .3rem;
+  }
+  .offshoot .oh { display: flex; align-items: center; gap: .55rem; flex-wrap: wrap; }
+  .arrow-lbl {
+    font-family: var(--mono); font-size: .62rem; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--muted);
+  }
+  .chip {
+    display: inline-flex; align-items: center; gap: .4rem;
+    font-size: .82rem; font-weight: 600;
+    padding: .25rem .6rem; border-radius: 100px;
+  }
+  .chip.warn { background: var(--warn-soft); color: var(--warn); }
+  .chip.lost { background: var(--lost-soft); color: var(--lost); }
+  .chip.won { background: var(--won-soft); color: var(--won); }
+  .chip.neutral { background: var(--surface-2); color: var(--ink); border: 1px solid var(--hair); }
+  .offshoot .od { font-size: .85rem; color: var(--muted); }
+
+  /* ---------- detail cards ---------- */
+  .cards { display: grid; gap: 1rem; grid-template-columns: 1fr 1fr; }
+  @media (max-width: 640px) { .cards { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--surface); border: 1px solid var(--hair); border-radius: 14px;
+    padding: 1.4rem 1.45rem; box-shadow: var(--shadow);
+    display: flex; flex-direction: column; gap: .7rem;
+  }
+  .card .ct { display: flex; align-items: center; gap: .6rem; }
+  .card .ct .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); flex: none; }
+  .card p { color: var(--muted); font-size: .92rem; }
+  .card ul { margin: 0; padding-left: 1.1rem; color: var(--muted); font-size: .9rem; display: flex; flex-direction: column; gap: .35rem; }
+  .card ul li strong { color: var(--ink); font-weight: 600; }
+  .req {
+    font-family: var(--mono); font-size: .7rem; letter-spacing: .04em;
+    color: var(--muted); background: var(--surface-2); border: 1px solid var(--hair);
+    border-radius: 7px; padding: .55rem .7rem; line-height: 1.5;
+  }
+  .req b { color: var(--accent-ink); }
+
+  /* rotation motif */
+  .rotation {
+    display: flex; flex-direction: column; gap: .8rem;
+    background: var(--surface); border: 1px solid var(--hair); border-radius: 14px;
+    padding: 1.4rem; box-shadow: var(--shadow); margin-top: 1rem;
+  }
+  .rot-track { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+  .sp {
+    display: inline-flex; align-items: center; gap: .5rem;
+    background: var(--surface-2); border: 1px solid var(--hair); border-radius: 100px;
+    padding: .4rem .8rem .4rem .45rem; font-size: .85rem; font-weight: 550;
+  }
+  .sp .av {
+    width: 24px; height: 24px; border-radius: 50%; background: var(--accent-soft);
+    color: var(--accent-ink); font-family: var(--mono); font-size: .7rem; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; flex: none;
+  }
+  .sp.next { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .sp.off { opacity: .45; text-decoration: line-through; text-decoration-color: var(--muted); }
+  .rot-arrow { color: var(--accent); font-size: 1.1rem; }
+  .rot-note { font-size: .82rem; color: var(--muted); display: flex; align-items: center; gap: .5rem; }
+  .rot-note .loop { font-family: var(--mono); color: var(--accent); }
+
+  /* ---------- confirm box ---------- */
+  .confirm {
+    background: var(--warn-soft);
+    border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
+    border-radius: 14px; padding: 1.5rem 1.6rem;
+    display: flex; flex-direction: column; gap: .9rem;
+  }
+  .confirm .ch { display: flex; align-items: center; gap: .6rem; }
+  .confirm .ch h3 { color: var(--warn); }
+  .confirm ol { margin: 0; padding-left: 1.3rem; display: flex; flex-direction: column; gap: .5rem; color: var(--ink); font-size: .92rem; }
+  .confirm ol li span { color: var(--muted); }
+
+  /* ---------- footer ---------- */
+  footer {
+    margin-top: 3.5rem; padding-top: 1.5rem; border-top: 1px solid var(--hair);
+    display: flex; flex-wrap: wrap; gap: 1rem; justify-content: space-between; align-items: center;
+    color: var(--muted); font-size: .82rem;
+  }
+  footer .mono { font-family: var(--mono); letter-spacing: .04em; }
+
+  /* entrance motion */
+  @media (prefers-reduced-motion: no-preference) {
+    .anim { opacity: 0; transform: translateY(12px); animation: rise .7s cubic-bezier(.2,.7,.2,1) forwards; }
+    .d1 { animation-delay: .05s; } .d2 { animation-delay: .12s; }
+    .d3 { animation-delay: .19s; } .d4 { animation-delay: .26s; }
+    @keyframes rise { to { opacity: 1; transform: none; } }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header class="hero">
+    <p class="eyebrow anim d1">Aetas &middot; Sales Operations</p>
+    <h1 class="anim d1">Lead Management Flow</h1>
+    <div class="anim d2" style="margin-top:1.25rem;">
+      <p class="lead-in">How an enquiry becomes a sale &mdash; from first capture to a closed order &mdash; and who owns it at every step.</p>
+    </div>
+    <div class="hero-meta anim d3">
+      <span class="pill-status">Proposal for approval</span>
+      <div class="meta-item">
+        <span class="k">Prepared</span>
+        <span class="v">22 July 2026</span>
+      </div>
+      <div class="meta-item">
+        <span class="k">Phase</span>
+        <span class="v">1 &mdash; Desk</span>
+      </div>
+      <div class="meta-item">
+        <span class="k">Channels</span>
+        <span class="v">Web &middot; Instagram &middot; Facebook &middot; WhatsApp &middot; Referral</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- AT A GLANCE -->
+  <section>
+    <div class="sec-head">
+      <h2>At a glance</h2>
+    </div>
+    <div class="principles anim d2">
+      <div class="principle">
+        <span class="idx">Capture</span>
+        <span class="t">Nothing slips</span>
+        <span class="d">Enquiries from the website and social channels land automatically; phone, WhatsApp and walk-in enquiries are entered on the desk.</span>
+      </div>
+      <div class="principle">
+        <span class="idx">Ownership</span>
+        <span class="t">Assigned on arrival</span>
+        <span class="d">Every lead gets an owner the moment it&rsquo;s created &mdash; the previous salesperson for a returning customer, or the next in the brand&rsquo;s rotation.</span>
+      </div>
+      <div class="principle">
+        <span class="idx">Pipeline</span>
+        <span class="t">A guided path</span>
+        <span class="d">Each lead moves through clear stages with a win-likelihood weighting, so the team always knows where a deal stands.</span>
+      </div>
+      <div class="principle">
+        <span class="idx">Handover</span>
+        <span class="t">Deliberate allocation</span>
+        <span class="d">When a visit is on the table, a manager assigns the lead to a store and a salesperson by hand &mdash; a considered decision, not a scramble.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- THE LIFECYCLE -->
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">01</span>
+      <div>
+        <h2>The lead lifecycle</h2>
+      </div>
+    </div>
+    <p class="sec-sub" style="margin-top:-.75rem;margin-bottom:1.75rem;">
+      The spine below is the path a healthy lead follows to a sale. The percentage on each stage is its win-likelihood weighting. Dashed branches show where a lead can exit early.
+    </p>
+
+    <div class="journey">
+
+      <!-- OPEN -->
+      <div class="node anim d1">
+        <div class="rail"><div class="badge start"><span class="pct small">Open</span></div></div>
+        <div class="node-body">
+          <div class="node-head">
+            <span class="stage-name">Lead created</span>
+            <span class="tag auto">Automatic status</span>
+          </div>
+          <p class="node-desc">A new lead is captured and immediately given an owner. Its status is set to <strong>Open</strong>, ready to be worked.</p>
+        </div>
+      </div>
+
+      <!-- IN PROGRESS -->
+      <div class="node anim d2">
+        <div class="rail"><div class="badge"><span class="pct">10%</span></div></div>
+        <div class="node-body">
+          <div class="node-head">
+            <span class="stage-name">In Progress</span>
+          </div>
+          <p class="node-desc">The owner reaches the customer. Once <strong>contacted</strong>, the lead moves into active work.</p>
+          <div class="branch">
+            <div class="offshoot">
+              <div class="oh">
+                <span class="arrow-lbl">If not contacted &rarr;</span>
+                <span class="chip neutral">Follow up</span>
+              </div>
+              <p class="od">Up to <strong>5 attempts</strong> are recorded with timestamps in the lead&rsquo;s journey (calls &amp; WhatsApp). If the customer still can&rsquo;t be reached, the lead is marked <span style="color:var(--warn);font-weight:600;">Unqualified &mdash; Not Contacted</span>.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- QUALIFIED -->
+      <div class="node anim d2">
+        <div class="rail"><div class="badge"><span class="pct">20%</span></div></div>
+        <div class="node-body">
+          <div class="node-head"><span class="stage-name">Qualified</span></div>
+          <p class="node-desc">There&rsquo;s genuine interest and a real fit. The lead is worth pursuing.</p>
+          <div class="branch">
+            <div class="offshoot">
+              <div class="oh">
+                <span class="arrow-lbl">Otherwise &rarr;</span>
+                <span class="chip warn">Unqualified</span>
+                <span class="arrow-lbl">&rarr;</span>
+                <span class="chip neutral">Closed</span>
+              </div>
+              <p class="od">If the lead doesn&rsquo;t qualify, a reason is chosen and the lead is closed out.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PROSPECTING -->
+      <div class="node anim d3">
+        <div class="rail"><div class="badge"><span class="pct">25%</span></div></div>
+        <div class="node-body">
+          <div class="node-head"><span class="stage-name">Prospecting</span></div>
+          <p class="node-desc">Active nurturing &mdash; sharing products, prices and options to move the customer toward a visit.</p>
+        </div>
+      </div>
+
+      <!-- VISIT PLANNED -->
+      <div class="node anim d3">
+        <div class="rail"><div class="badge"><span class="pct">50%</span></div></div>
+        <div class="node-body">
+          <div class="node-head"><span class="stage-name">Visit Planned</span></div>
+          <p class="node-desc">A store visit is on the calendar &mdash; the strongest signal of intent so far.</p>
+          <div class="branch">
+            <div class="offshoot">
+              <div class="oh">
+                <span class="arrow-lbl">No visit &rarr;</span>
+                <span class="chip warn">Unqualified</span>
+              </div>
+              <p class="od">If no visit materialises, the lead is marked unqualified with a reason.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ALLOCATION -->
+      <div class="node anim d4">
+        <div class="rail"><div class="badge"><span class="pct">80%</span></div></div>
+        <div class="node-body">
+          <div class="node-head">
+            <span class="stage-name">Lead Allocation</span>
+            <span class="tag desk">Manual &middot; Desk</span>
+          </div>
+          <p class="node-desc">A manager hands the lead to a <strong>store</strong> and a <strong>salesperson</strong>. They pick the store, then choose from the salespeople at that store. This is a deliberate, manual decision.</p>
+        </div>
+      </div>
+
+      <!-- CLOSED WON -->
+      <div class="node anim d4">
+        <div class="rail"><div class="badge won"><span class="pct">100%</span></div></div>
+        <div class="node-body">
+          <div class="node-head">
+            <span class="stage-name">Closed Won</span>
+            <span class="tag auto">Invoice auto-tagged</span>
+          </div>
+          <p class="node-desc">The sale is made. The related invoice is linked to the lead automatically. In store, the team completes the customer tagging &amp; consent step that follows a purchase.</p>
+          <div class="branch">
+            <div class="offshoot">
+              <div class="oh">
+                <span class="arrow-lbl">Or &rarr;</span>
+                <span class="chip lost">Closed Lost</span>
+              </div>
+              <p class="od">If the deal doesn&rsquo;t come through, the lead closes as lost with a reason. Every lead ends as either <strong>Closed Won</strong> or <strong>Closed Lost</strong>.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- INTAKE -->
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">02</span>
+      <div><h2>How leads come in</h2></div>
+    </div>
+    <p class="sec-sub" style="margin-top:-.75rem;margin-bottom:1.5rem;">Two routes, one destination &mdash; both create a lead ready to be owned and worked.</p>
+    <div class="cards">
+      <div class="card">
+        <div class="ct"><span class="dot"></span><h3>Automatic capture</h3></div>
+        <p>Enquiries from the website, Instagram, Facebook and campaigns arrive on their own through the website enquiry connection. The customer&rsquo;s details and the product they asked about are filled in automatically.</p>
+        <div class="req">Captured automatically: <b>name, email, phone, city, product, model, price, page, source</b> &amp; <b>brand</b>. Campaign reference stored as a tag.</div>
+      </div>
+      <div class="card">
+        <div class="ct"><span class="dot"></span><h3>Manual entry</h3></div>
+        <p>For WhatsApp, incoming calls and referrals, the team creates the lead on the desk and notes where it came from.</p>
+        <div class="req">Required: <b>source, customer name, mobile, email</b>. Optional: <b>brand, product</b>.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ASSIGNMENT -->
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">03</span>
+      <div><h2>Who gets the lead</h2></div>
+    </div>
+    <p class="sec-sub" style="margin-top:-.75rem;margin-bottom:1.5rem;">
+      Every lead is assigned an owner the moment it&rsquo;s created &mdash; the system first checks whether we already know this customer (by matching their mobile or email against past leads).
+    </p>
+    <div class="cards">
+      <div class="card">
+        <div class="ct"><span class="dot"></span><h3>Returning customer</h3></div>
+        <p>If we&rsquo;ve dealt with them before for this brand, the lead goes straight back to the salesperson who last handled them &mdash; keeping the relationship intact. Brand rotation is skipped.</p>
+      </div>
+      <div class="card">
+        <div class="ct"><span class="dot"></span><h3>New customer</h3></div>
+        <p>A brand-new customer &mdash; or a familiar one asking about a brand they haven&rsquo;t enquired on before &mdash; is assigned by the brand&rsquo;s rotation, so enquiries are shared evenly across the team.</p>
+      </div>
+    </div>
+
+    <div class="rotation anim d1">
+      <div class="ct" style="display:flex;align-items:center;gap:.6rem;"><span class="dot" style="width:9px;height:9px;border-radius:50%;background:var(--accent);"></span><h3>Brand rotation, in turn</h3></div>
+      <p style="color:var(--muted);font-size:.9rem;max-width:64ch;">Each brand keeps its own list of salespeople. New leads are handed out one after another &mdash; first lead to the first person, next to the second, and so on. Once everyone has had one, it starts again from the top. Anyone marked unavailable is skipped.</p>
+      <div class="rot-track">
+        <span class="sp"><span class="av">A</span>Salesperson 1</span>
+        <span class="rot-arrow">&rarr;</span>
+        <span class="sp off"><span class="av">B</span>Salesperson 2</span>
+        <span class="rot-arrow">&rarr;</span>
+        <span class="sp next"><span class="av">C</span>Salesperson 3 &middot; next</span>
+        <span class="rot-arrow">&rarr;</span>
+        <span class="sp"><span class="av">D</span>Salesperson 4</span>
+      </div>
+      <div class="rot-note"><span class="loop">&#8635;</span> Skips <b>Salesperson&nbsp;2</b> (marked unavailable) and loops back to the top after the last.</div>
+    </div>
+  </section>
+
+  <!-- WORKING & ALLOCATION -->
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">04</span>
+      <div><h2>Working &amp; handing over</h2></div>
+    </div>
+    <div class="cards">
+      <div class="card">
+        <div class="ct"><span class="dot"></span><h3>Following up</h3></div>
+        <p>Every call and WhatsApp touch is logged with a timestamp in the lead&rsquo;s journey. A lead that can&rsquo;t be reached after five attempts is closed out as unqualified &mdash; no lead lingers untouched.</p>
+      </div>
+      <div class="card">
+        <div class="ct"><span class="dot"></span><h3>Allocation by hand</h3></div>
+        <p>At the visit stage a manager allocates the lead on the desk: choose the store, then pick a salesperson from that store. A single, accountable decision &mdash; there is no bidding or automatic grab.</p>
+      </div>
+      <div class="card">
+        <div class="ct"><span class="dot"></span><h3>Closing the sale</h3></div>
+        <p>A won lead has its invoice linked automatically. The in-store team then completes customer tagging and consent &mdash; the routine that follows any purchase.</p>
+      </div>
+      <div class="card">
+        <div class="ct"><span class="dot"></span><h3>Every lead lands</h3></div>
+        <p>No lead is left in limbo. Each one finishes in a definite state &mdash; <span style="color:var(--won);font-weight:600;">Closed Won</span> or <span style="color:var(--lost);font-weight:600;">Closed Lost</span> &mdash; giving clean, reliable reporting.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CONFIRM -->
+  <section>
+    <div class="confirm anim d1">
+      <div class="ch"><h3>For your confirmation</h3></div>
+      <p style="color:var(--ink);font-size:.92rem;max-width:64ch;">A few small details we&rsquo;d like to lock down with you before build:</p>
+      <ol>
+        <li>The full list of <strong>&ldquo;unqualified&rdquo; reasons</strong> to offer. <span>(Starting point: &ldquo;Not Contacted.&rdquo;)</span></li>
+        <li>What should happen when an <strong>automatic lead arrives without a brand</strong>, or a brand has no available salesperson. <span>(Suggested: hold for manual assignment.)</span></li>
+        <li>The exact <strong>in-store tagging &amp; consent</strong> steps after a sale. <span>(Recorded here as information only.)</span></li>
+        <li>Confirmation that the enquiry feed will now <strong>include the brand</strong> with each lead.</li>
+      </ol>
+    </div>
+  </section>
+
+  <footer>
+    <span>Lead Management Flow &mdash; process design for review.</span>
+    <span class="mono">AETAS &middot; PHASE 1 &middot; DESK</span>
+  </footer>
+
+</div>
+
+</body>
+</html>
