@@ -163,7 +163,10 @@ def _execute(filters=None, additional_table_columns=None, additional_query_colum
 		data.append(total_row_map.get("total_row"))
 		skip_total_row = 1
 	
-	get_purchase_rate(data)
+	# Item-wise COGS + serial rate maps.
+	purchase_maps = get_purchase_rate(data)
+	# OPTION B — split multi-serial lines into one row per serial (serial-wise COGS).
+	data = split_rows_by_serial(data, purchase_maps)
 	get_customer_type(data)
 	# data = merge_duplicate_items(data)
 
@@ -332,7 +335,85 @@ def get_purchase_rate(data):
 		else:
 			d["mrp"] = item_mrp_cache.get(item_code)
 
-	return data
+	# Return the maps so rows can later be split serial-wise (Option B).
+	return {
+		"serial_rate_map": serial_rate_map,
+		"serial_mrp_map": serial_mrp_map,
+		"item_mrp_cache": item_mrp_cache,
+	}
+
+
+def split_rows_by_serial(data, maps):
+	"""
+	OPTION B — Serial-wise rows.
+
+	If a sold line has more than one serial number, break it into one row per
+	serial. Each serial row gets:
+		- serial_no  -> that single serial
+		- qty/stock_qty -> 1
+		- purchase_rate (COGS) -> that serial's own buy rate (serial_rate_map),
+		  GST excluded. Falls back to a per-serial share of the line COGS, then
+		  Item master MRP.
+		- rate / amount -> the line values split equally across the serials.
+
+	Rows with 0 or 1 serial are kept as-is. Total rows and sub-total rows
+	(dicts without item_code / bold markers) are passed through untouched.
+	"""
+	if not data:
+		return data
+
+	serial_rate_map = maps.get("serial_rate_map", {})
+	serial_mrp_map = maps.get("serial_mrp_map", {})
+	item_mrp_cache = maps.get("item_mrp_cache", {})
+
+	new_data = []
+
+	for d in data:
+		# Skip total / sub-total / blank rows — leave them exactly as they are.
+		if not isinstance(d, dict) or not d.get("item_code") or d.get("bold"):
+			new_data.append(d)
+			continue
+
+		item_code = d.get("item_code")
+		raw_serial = d.get("serial_no")
+
+		serials = []
+		if raw_serial:
+			serials = [x.strip() for x in raw_serial.replace("\n", ",").split(",") if x.strip()]
+
+		# 0 or 1 serial -> nothing to split, keep the row as-is.
+		if len(serials) <= 1:
+			new_data.append(d)
+			continue
+
+		count = len(serials)
+		# Line-level values to split equally across the serials.
+		line_amount = flt(d.get("amount"))
+		line_rate = flt(d.get("rate"))
+		line_qty = flt(d.get("stock_qty"))
+		line_cogs = flt(d.get("purchase_rate"))  # total line COGS from item-wise step
+		cogs_share = line_cogs / count if count else 0
+
+		for sn in serials:
+			row = dict(d)  # copy all other columns (customer, invoice, etc.)
+			row["serial_no"] = sn
+			row["stock_qty"] = line_qty / count if count else line_qty
+			row["amount"] = line_amount / count if count else line_amount
+			row["rate"] = line_rate  # per-unit rate stays the same
+
+			# Serial's own COGS (GST excluded): exact buy rate for this serial,
+			# else an equal share of the line COGS, else Item master MRP.
+			row["purchase_rate"] = (
+				serial_rate_map.get((item_code, sn))
+				or cogs_share
+				or item_mrp_cache.get(item_code, 0)
+			)
+			# Serial's own MRP where available.
+			row["mrp"] = serial_mrp_map.get((item_code, sn), d.get("mrp"))
+
+			new_data.append(row)
+
+	return new_data
 
 
 def get_customer_type(data):
