@@ -13,7 +13,10 @@ import frappe
 from frappe import _
 from frappe.model.workflow import apply_workflow
 
-from aetas_customization.lead.assignment import get_salespersons_for_store
+from aetas_customization.lead.assignment import (
+    get_salespersons_for_store,
+    sales_person_to_user,
+)
 from aetas_customization.lead.pipeline import update_customer_salesperson
 
 # NOTE: frappe.model.workflow.apply_workflow() reloads the doc via load_from_db()
@@ -65,3 +68,48 @@ def mark_unqualified(lead: str, reason: str) -> dict:
     doc.db_set("custom_unqualified_reason", reason)
     apply_workflow(doc, "Mark Unqualified")
     return {"status": "unqualified"}
+
+
+@frappe.whitelist()
+def close_won_route(lead: str) -> str:
+    """Decide the Closed Won path for the acting user: 'store' | 'owner' | 'choose'.
+
+    By exact person: the allocated salesperson's User → store path (create invoice);
+    the lead_owner → owner path (enter existing invoice number). Neither/both → choose.
+    """
+    doc = frappe.get_doc("Lead", lead)
+    user = frappe.session.user
+    is_owner = bool(doc.lead_owner) and user == doc.lead_owner
+    sp_user = sales_person_to_user(doc.custom_sales_person) if doc.custom_sales_person else None
+    is_store = bool(sp_user) and user == sp_user
+
+    if is_store and not is_owner:
+        return "store"
+    if is_owner and not is_store:
+        return "owner"
+    return "choose"
+
+
+@frappe.whitelist()
+def close_won_with_invoice(lead: str, invoice: str) -> dict:
+    """Owner path: tag an existing submitted Sales Invoice, then apply Close Won."""
+    if not invoice:
+        frappe.throw(_("An invoice is required."))
+    inv = frappe.db.get_value(
+        "Sales Invoice", invoice, ["customer", "docstatus"], as_dict=True
+    )
+    if not inv:
+        frappe.throw(_("Sales Invoice {0} not found.").format(invoice))
+    if inv.docstatus != 1:
+        frappe.throw(_("Sales Invoice {0} is not submitted.").format(invoice))
+
+    doc = frappe.get_doc("Lead", lead)
+    if doc.customer and inv.customer != doc.customer:
+        frappe.throw(
+            _("Invoice customer {0} does not match the lead's customer {1}.").format(
+                inv.customer, doc.customer
+            )
+        )
+    doc.db_set("custom_si_ref", invoice)
+    apply_workflow(doc, "Close Won")
+    return {"status": "closed_won", "invoice": invoice}
