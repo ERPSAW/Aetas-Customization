@@ -645,10 +645,31 @@ frappe.ui.form.on('Lead', {
                 log_contact_attempt(frm);
             }, __('Follow Up'));
         }
+
+        render_customer_history(frm);
+        render_won_invoice(frm);
+    },
+
+    // Journey table: auto-fill the read-only By User / To Customer on row add.
+    custom_lead_journey_add(frm, cdt, cdn) {
+        const row = locals[cdt][cdn];
+        frappe.model.set_value(cdt, cdn, 'by_user', frappe.session.user);
+        if (frm.doc.customer) {
+            frappe.model.set_value(cdt, cdn, 'to_customer', frm.doc.customer);
+        }
+        if (!row.initiated_at) {
+            frappe.model.set_value(cdt, cdn, 'initiated_at', frappe.datetime.now_datetime());
+        }
     },
 
     before_workflow_action(frm) {
         const action = frm.selected_workflow_action;
+        if (action === 'Close Won') {
+            // Two person-based paths (see lead/actions.py::close_won_route).
+            frappe.dom.unfreeze();
+            handle_close_won(frm);
+            return new Promise(() => { });
+        }
         if (!(action in LEAD_PIPELINE)) {
             // Simple transition — resolve normally so the engine applies it.
             return;
@@ -792,4 +813,111 @@ function log_contact_attempt(frm) {
         },
     });
     d.show();
+}
+
+// ---- Closed Won: two person-based paths -------------------------------------
+function handle_close_won(frm) {
+    frappe.call({
+        method: 'aetas_customization.lead.actions.close_won_route',
+        args: { lead: frm.doc.name },
+        callback(r) {
+            const route = r.message;
+            if (route === 'store') return open_store_invoice(frm);
+            if (route === 'owner') return owner_invoice_dialog(frm);
+            return close_won_choose_dialog(frm);
+        },
+    });
+}
+
+function open_store_invoice(frm) {
+    // Store path: redirect to a new Sales Invoice (customer + custom_lead_ref
+    // prefilled). The lead auto-moves to Closed Won when that invoice is submitted
+    // (see lead/sales_invoice_hooks.py).
+    frappe.model.open_mapped_doc({
+        method: 'aetas_customization.overrides.lead.make_sales_invoice_from_lead',
+        frm: frm,
+    });
+}
+
+function owner_invoice_dialog(frm) {
+    // Owner path: record an existing submitted invoice, then Close Won.
+    const d = new frappe.ui.Dialog({
+        title: __('Close Won — Enter Invoice'),
+        fields: [
+            {
+                label: __('Invoice Number'), fieldname: 'invoice', fieldtype: 'Link',
+                options: 'Sales Invoice', reqd: 1,
+                get_query() {
+                    const filters = { docstatus: 1 };
+                    if (frm.doc.customer) filters.customer = frm.doc.customer;
+                    return { filters };
+                },
+            },
+        ],
+        primary_action_label: __('Close Won'),
+        primary_action(values) {
+            frappe.call({
+                method: 'aetas_customization.lead.actions.close_won_with_invoice',
+                args: { lead: frm.doc.name, invoice: values.invoice },
+                freeze: true,
+                callback() {
+                    d.hide();
+                    frm.reload_doc();
+                    frappe.show_alert({ message: __('Closed Won'), indicator: 'green' });
+                },
+            });
+        },
+    });
+    d.show();
+}
+
+function close_won_choose_dialog(frm) {
+    const d = new frappe.ui.Dialog({
+        title: __('Close Won'),
+        fields: [
+            { fieldtype: 'HTML', options: `<p>${__('How do you want to record this sale?')}</p>` },
+        ],
+        primary_action_label: __('Enter Invoice Number'),
+        primary_action() { d.hide(); owner_invoice_dialog(frm); },
+        secondary_action_label: __('Create Invoice'),
+        secondary_action() { d.hide(); open_store_invoice(frm); },
+    });
+    d.show();
+}
+
+// ---- HTML injections --------------------------------------------------------
+function render_won_invoice(frm) {
+    const f = frm.fields_dict.custom_won_invoice_html;
+    if (!f) return;
+    if (!frm.doc.custom_si_ref) { f.$wrapper.empty(); return; }
+    frappe.call({
+        method: 'aetas_customization.lead.history.get_invoice_lines_html',
+        args: { invoice: frm.doc.custom_si_ref },
+        callback(r) { f.$wrapper.html(r.message || ''); },
+    });
+}
+
+function render_customer_history(frm) {
+    const ph = frm.fields_dict.custom_purchase_history_html;
+    const lh = frm.fields_dict.custom_lead_history_html;
+    if (!frm.doc.customer) {
+        const msg = `<div class="text-muted" style="padding:8px 0;">${__('No customer linked.')}</div>`;
+        if (ph) ph.$wrapper.html(msg);
+        if (lh) lh.$wrapper.html(msg);
+        return;
+    }
+    if (ph) {
+        frappe.call({
+            method: 'aetas_customization.lead.history.get_customer_purchase_history',
+            args: { customer: frm.doc.customer },
+            callback(r) { ph.$wrapper.html(r.message || ''); },
+        });
+    }
+    if (lh) {
+        frappe.call({
+            method: 'aetas_customization.lead.history.get_customer_lead_history',
+            args: { customer: frm.doc.customer, exclude_lead: frm.doc.name },
+            callback(r) { lh.$wrapper.html(r.message || ''); },
+        });
+    }
 }

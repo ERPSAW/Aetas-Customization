@@ -40,7 +40,8 @@ def validate(doc, method):
 
 
 def after_insert(doc, method):
-    """Assign the owning salesperson (existing-customer reuse or round-robin)."""
+    """Resolve the Customer (link/create) and set the Lead Owner at creation."""
+    pipeline.resolve_customer(doc)
     assignment.assign_lead(doc)
 
 

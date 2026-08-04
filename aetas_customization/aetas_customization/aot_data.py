@@ -696,6 +696,8 @@ def _email_html(snapshot_data):
 <h2 style="color:#0f172a">AOT Sales Dashboard — {date.today().strftime('%-d %b %Y')}</h2>
 {_section('daily', 'Daily Snapshot')}
 {_section('mtd',   'MTD Snapshot')}
+{_section('qtd',   'QTD Snapshot')}
+{_section('ytd',   'YTD Snapshot')}
 <p style="color:#94a3b8;font-size:12px;margin-top:20px">Full data attached as Excel (3 sheets: Snapshot, Brand Summary, Store Summary).</p>
 </body></html>"""
 

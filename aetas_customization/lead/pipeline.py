@@ -7,15 +7,13 @@ The pipeline itself is a Frappe **Workflow** ("Lead Pipeline") on ``workflow_sta
 the workflow engine enforces the allowed transitions and sets ``custom_probability``
 via each state's Update Field/Value.
 
-This module only runs the *side-effects* of entering a state — things a workflow
-"Update Field" cannot do — detected from ``Lead.on_update`` by comparing the saved
-state with the previous one:
+This module runs:
+* ``resolve_customer`` at ``Lead.after_insert`` — link/create the Customer at creation.
+* state-change *side-effects* from ``Lead.on_update`` (comparing saved vs previous state):
+  entering **Closed Won** → tag the linked Sales Invoice into ``custom_si_ref``.
 
-* entering **Qualified** (type New)  → auto-create the Customer
-* entering **Closed Won**            → tag the linked Sales Invoice into ``custom_si_ref``
-
-All side-effects use ``db_set`` only. They never call ``apply_workflow`` or ``save``
-from within the ``on_update`` path, avoiding transition recursion.
+State-change side-effects use ``db_set`` only. They never call ``apply_workflow`` or
+``save`` from within the ``on_update`` path, avoiding transition recursion.
 """
 
 import frappe
@@ -42,46 +40,56 @@ def handle_state_change(doc) -> None:
     if previous.workflow_state == doc.workflow_state:
         return
 
-    new_state = doc.workflow_state
-    if new_state == "Qualified" and doc.type == "New":
-        # Non-blocking: a data gap (e.g. missing mandatory Customer field) must not
-        # roll back the Qualify transition. Warn and let the user fix the lead.
-        try:
-            create_customer_from_lead(doc)
-        except Exception:
-            frappe.log_error(frappe.get_traceback(), "Lead: customer creation on Qualify")
-            frappe.msgprint(
-                _("Lead qualified, but the Customer could not be created automatically. "
-                  "Please check the lead's contact/source details."),
-                indicator="orange",
-                alert=True,
-            )
-    elif new_state == "Closed Won":
+    if doc.workflow_state == "Closed Won":
         tag_sales_invoice(doc)
 
 
-def create_customer_from_lead(doc) -> None:
-    """Create a Customer for a newly Qualified lead (idempotent).
+def resolve_customer(doc) -> None:
+    """Link or create the Customer at lead CREATION (called from ``after_insert``).
 
-    ``ignore_permissions`` is justified: this is a system-driven creation triggered
-    by the pipeline, and a Lead User (salesperson) will not normally hold Customer
-    create rights.
+    Match priority: (1) ``Customer.custom_contact == Lead.custom_contact``,
+    (2) ``Customer.custom_email == Lead.email_id``. If matched → link + mark the lead
+    ``Existing Customer``; otherwise create a new Customer now + mark ``New``.
+
+    Non-blocking: a data gap must never roll back lead creation (important for the
+    webhook path). ``ignore_permissions`` is justified — system-driven creation and a
+    Lead User will not normally hold Customer create rights.
     """
     if doc.customer:
         return
-    if not doc.lead_name:
-        return
+    try:
+        match = None
+        if doc.custom_contact:
+            match = frappe.db.get_value(
+                "Customer", {"custom_contact": doc.custom_contact}, "name"
+            )
+        if not match and doc.email_id:
+            match = frappe.db.get_value(
+                "Customer", {"custom_email": doc.email_id}, "name"
+            )
 
-    # Idempotency: skip if a customer already matches this enquirer.
-    existing = frappe.db.get_value(
-        "Customer",
-        {"customer_name": doc.lead_name, "custom_contact": doc.custom_contact},
-        "name",
-    )
-    if existing:
-        doc.db_set("customer", existing)
-        return
+        if match:
+            doc.db_set("customer", match)
+            doc.db_set("type", "Existing Customer")
+            return
 
+        if not doc.lead_name:
+            return
+        customer = _build_customer(doc)
+        customer.insert(ignore_permissions=True)
+        doc.db_set("customer", customer.name)
+        doc.db_set("type", "New")
+        frappe.msgprint(
+            _("Customer {0} created from Lead {1}").format(customer.name, doc.name),
+            indicator="green",
+            alert=True,
+        )
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), "Lead: customer resolution at creation")
+
+
+def _build_customer(doc):
+    """Build (unsaved) a Customer document from a Lead."""
     customer = frappe.get_doc(
         {
             "doctype": "Customer",
@@ -92,6 +100,7 @@ def create_customer_from_lead(doc) -> None:
             "lead_name": doc.name,
             "custom_source": doc.source,
             "custom_contact": doc.custom_contact,
+            "custom_email": doc.email_id,
             "custom_client_tiers": "Potential",
             "custom_sales_person": doc.custom_sales_person,
             "custom_customer_without_sales": 1,
@@ -102,14 +111,7 @@ def create_customer_from_lead(doc) -> None:
             "sales_team",
             {"sales_person": doc.custom_sales_person, "allocated_percentage": 100},
         )
-
-    customer.insert(ignore_permissions=True)
-    doc.db_set("customer", customer.name)
-    frappe.msgprint(
-        _("Customer {0} created from Lead {1}").format(customer.name, doc.name),
-        indicator="green",
-        alert=True,
-    )
+    return customer
 
 
 def update_customer_salesperson(doc) -> None:
