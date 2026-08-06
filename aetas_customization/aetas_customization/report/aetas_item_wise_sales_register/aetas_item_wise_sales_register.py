@@ -279,8 +279,11 @@ def get_purchase_rate(data):
 	# and doubles the reported cost. Keying on the line keeps each line's own
 	# COGS with that line.
 	#
-	# `stock_value_difference` is the value of stock that left on the sale
-	# (valuation_rate * qty). On a sale it is negative, so we take ABS().
+	# `stock_value_difference` is the value of stock that moved (valuation_rate *
+	# qty): negative on a sale (stock leaves), positive on a return (stock comes
+	# back). We negate it so a sale reports positive COGS and a credit note /
+	# return reports negative COGS — matching the negative Qty and Amount already
+	# shown on those rows.
 	# Stock valuation never includes GST, so this is already tax-free.
 	sle_cogs_map = {}
 
@@ -312,7 +315,7 @@ def get_purchase_rate(data):
 			if row.voucher_detail_no:
 				sle_cogs_map[row.voucher_detail_no] = (
 					sle_cogs_map.get(row.voucher_detail_no, 0)
-					+ abs(flt(row.stock_value_difference))
+					- flt(row.stock_value_difference)
 				)
 
 	# ============================================================
@@ -345,11 +348,21 @@ def get_purchase_rate(data):
 		# Fallback: old per-unit rate logic, then Item master MRP.
 		cogs = sle_cogs_map.get(d.get("si_item_name"))
 		if cogs is not None:
+			# Already carries the right sign: positive on a sale, negative on a
+			# return (see how sle_cogs_map is built).
 			d["purchase_rate"] = cogs
-		elif sn:
-			d["purchase_rate"] = serial_rate_map.get((item_code, sn), item_mrp_cache.get(item_code))
 		else:
-			d["purchase_rate"] = sle_rate_map.get((invoice, item_code), item_mrp_cache.get(item_code))
+			# Fallback rates are always stored positive, so mirror the sign of the
+			# sold qty — a return line (negative qty) must report negative COGS.
+			if sn:
+				fallback = serial_rate_map.get((item_code, sn), item_mrp_cache.get(item_code))
+			else:
+				fallback = sle_rate_map.get((invoice, item_code), item_mrp_cache.get(item_code))
+
+			if flt(d.get("stock_qty")) < 0:
+				fallback = -abs(flt(fallback))
+
+			d["purchase_rate"] = fallback
 
 		# ---------------- MRP LOGIC ----------------
 		if sn:
@@ -425,11 +438,22 @@ def split_rows_by_serial(data, maps):
 
 			# Serial's own COGS (GST excluded): exact buy rate for this serial,
 			# else an equal share of the line COGS, else Item master MRP.
-			row["purchase_rate"] = (
-				serial_rate_map.get((item_code, sn))
-				or cogs_share
-				or item_mrp_cache.get(item_code, 0)
-			)
+			# `is not None` rather than `or`, so a genuine zero rate is kept
+			# instead of silently falling through to the next fallback.
+			serial_cogs = serial_rate_map.get((item_code, sn))
+			if serial_cogs is not None:
+				# Stored positive; mirror the line's sign so a return stays negative.
+				serial_cogs = flt(serial_cogs)
+				if line_cogs < 0:
+					serial_cogs = -abs(serial_cogs)
+			elif cogs_share:
+				serial_cogs = cogs_share
+			else:
+				serial_cogs = flt(item_mrp_cache.get(item_code, 0))
+				if line_cogs < 0:
+					serial_cogs = -abs(serial_cogs)
+
+			row["purchase_rate"] = serial_cogs
 			# Serial's own MRP where available.
 			row["mrp"] = serial_mrp_map.get((item_code, sn), d.get("mrp"))
 
