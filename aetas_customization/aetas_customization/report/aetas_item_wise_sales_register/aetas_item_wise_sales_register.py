@@ -57,6 +57,9 @@ def _execute(filters=None, additional_table_columns=None, additional_query_colum
 			delivery_note = d.parent
 
 		row = {
+			# Sales Invoice Item row name — used to look up this exact line's COGS
+			# from the Stock Ledger Entry (see get_purchase_rate).
+			"si_item_name": d.name,
 			"item_code": d.item_code,
 			"item_name": item_record.item_name if item_record else d.item_name,
 			"item_group": item_record.item_group if item_record else d.item_group,
@@ -268,8 +271,15 @@ def get_purchase_rate(data):
 	invoices = list({inv for inv, _ in invoice_item_pairs})
 
 	sle_rate_map = {}
-	# COGS (Cost of Goods Sold) amount, GST excluded, per invoice + item.
-	# `stock_value_difference` is the total value of stock that left on the sale
+	# COGS (Cost of Goods Sold) amount, GST excluded, keyed by the Sales Invoice
+	# Item row (`voucher_detail_no`) — NOT by (invoice, item_code).
+	#
+	# When the same item is sold on two separate invoice lines (one per serial),
+	# an (invoice, item_code) key hands the whole invoice's COGS to BOTH lines
+	# and doubles the reported cost. Keying on the line keeps each line's own
+	# COGS with that line.
+	#
+	# `stock_value_difference` is the value of stock that left on the sale
 	# (valuation_rate * qty). On a sale it is negative, so we take ABS().
 	# Stock valuation never includes GST, so this is already tax-free.
 	sle_cogs_map = {}
@@ -279,6 +289,7 @@ def get_purchase_rate(data):
 			SELECT
 				item_code,
 				voucher_no,
+				voucher_detail_no,
 				CASE
 					WHEN valuation_rate > 0 THEN valuation_rate
 					WHEN incoming_rate > 0 THEN incoming_rate
@@ -296,9 +307,13 @@ def get_purchase_rate(data):
 			key = (row.voucher_no, row.item_code)
 			if key not in sle_rate_map:
 				sle_rate_map[key] = row.rate
-			# Sum COGS across all SLE rows for this invoice+item
-			# (a single sale line can produce multiple ledger entries).
-			sle_cogs_map[key] = sle_cogs_map.get(key, 0) + abs(flt(row.stock_value_difference))
+			# Sum COGS per invoice LINE — a single line can still produce several
+			# ledger entries (multiple warehouses / batches), so they add up.
+			if row.voucher_detail_no:
+				sle_cogs_map[row.voucher_detail_no] = (
+					sle_cogs_map.get(row.voucher_detail_no, 0)
+					+ abs(flt(row.stock_value_difference))
+				)
 
 	# ============================================================
 	# ASSIGN BACK VALUES
@@ -317,12 +332,19 @@ def get_purchase_rate(data):
 			sn = serial_no.replace("\n", ",").split(",")[0].strip()
 
 		# ---------------- PURCHASE RATE (COGS, GST excluded) ----------------
-		# Total Cost of Goods Sold for this invoice + item line, taken from the
-		# Stock Ledger Entry (valuation_rate * qty). Stock valuation never
-		# includes GST, so this amount is already tax-free.
+		# Cost of Goods Sold for THIS invoice line, taken from the Stock Ledger
+		# Entry (valuation_rate * qty). Stock valuation never includes GST, so
+		# this amount is already tax-free.
+		#
+		# Looked up by the invoice line (si_item_name), so two lines of the same
+		# item on one invoice each get their own cost instead of both getting the
+		# invoice total.
+		#
+		# `is not None` (not a truthiness check) so a genuine zero-cost line is
+		# reported as 0 rather than falling through to the MRP fallback.
 		# Fallback: old per-unit rate logic, then Item master MRP.
-		cogs = sle_cogs_map.get((invoice, item_code))
-		if cogs:
+		cogs = sle_cogs_map.get(d.get("si_item_name"))
+		if cogs is not None:
 			d["purchase_rate"] = cogs
 		elif sn:
 			d["purchase_rate"] = serial_rate_map.get((item_code, sn), item_mrp_cache.get(item_code))
