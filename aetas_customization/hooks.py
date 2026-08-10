@@ -261,12 +261,22 @@ override_doctype_class = {
 
 doc_events = {
     "Purchase Invoice": {
-        "before_validate": "aetas_customization.aetas_customization.overrides.purchase_invoice.before_validate",
+        "before_validate": [
+            # Addresses must land before india_compliance derives company_gstin
+            # and place of supply from billing_address.
+            "aetas_customization.aetas_customization.invoice_series_config.apply_series_config",
+            "aetas_customization.aetas_customization.overrides.purchase_invoice.before_validate",
+        ],
         "on_submit": "aetas_customization.aetas_customization.overrides.purchase_invoice.on_submit",
         "on_cancel": "aetas_customization.aetas_customization.overrides.purchase_invoice.on_cancel",
     },
     "Sales Invoice": {
-        "before_validate": "aetas_customization.test_setup.ensure_sales_invoice_mandatory_fields_for_tests",
+        "before_validate": [
+            # Addresses must land before india_compliance's validate derives
+            # company_gstin and place of supply from company_address.
+            "aetas_customization.aetas_customization.invoice_series_config.apply_series_config",
+            "aetas_customization.test_setup.ensure_sales_invoice_mandatory_fields_for_tests",
+        ],
         "validate": "aetas_customization.aetas_customization.overrides.sales_invoice.validate",
         "before_submit": "aetas_customization.aetas_customization.overrides.sales_invoice.before_submit",
         "on_submit": [

@@ -1,0 +1,141 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:{document_type}-{naming_series}",
+ "creation": "2026-08-10 13:12:00.000000",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "document_type",
+  "column_break_series",
+  "naming_series",
+  "enabled",
+  "section_break_accounting",
+  "cost_center",
+  "column_break_accounting",
+  "set_warehouse",
+  "section_break_addresses",
+  "billing_address",
+  "column_break_addresses",
+  "shipping_address"
+ ],
+ "fields": [
+  {
+   "fieldname": "document_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Document Type",
+   "options": "\nSales Invoice\nPurchase Invoice",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_series",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Must match the invoice's Naming Series exactly, e.g. <code>BN/25-26/.#####</code>",
+   "fieldname": "naming_series",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Naming Series",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "section_break_accounting",
+   "fieldtype": "Section Break",
+   "label": "Accounting & Stock"
+  },
+  {
+   "fieldname": "cost_center",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Cost Center",
+   "options": "Cost Center"
+  },
+  {
+   "fieldname": "column_break_accounting",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "set_warehouse",
+   "fieldtype": "Link",
+   "label": "Set Source Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "section_break_addresses",
+   "fieldtype": "Section Break",
+   "label": "Addresses"
+  },
+  {
+   "description": "Sales Invoice → Company Address &nbsp;·&nbsp; Purchase Invoice → Billing Address",
+   "fieldname": "billing_address",
+   "fieldtype": "Link",
+   "label": "Billing Address",
+   "options": "Address"
+  },
+  {
+   "fieldname": "column_break_addresses",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Sales Invoice → Dispatch Address &nbsp;·&nbsp; Purchase Invoice → Shipping Address",
+   "fieldname": "shipping_address",
+   "fieldtype": "Link",
+   "label": "Shipping Address",
+   "options": "Address"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-10 13:12:00.000000",
+ "modified_by": "Administrator",
+ "module": "Aetas Customization",
+ "name": "Invoice Series Configuration",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Accounts Manager",
+   "create": 1,
+   "write": 1,
+   "export": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "role": "Accounts User"
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
