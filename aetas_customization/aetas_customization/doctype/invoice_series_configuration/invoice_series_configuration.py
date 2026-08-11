@@ -7,6 +7,7 @@ from frappe.model.document import Document
 
 from aetas_customization.aetas_customization.invoice_series_config import (
 	clear_series_config_cache,
+	normalize_series,
 )
 
 
@@ -29,29 +30,46 @@ class InvoiceSeriesConfiguration(Document):
 		self.validate_duplicate()
 
 	def validate_duplicate(self):
-		"""One entry per (document_type, naming_series).
+		"""One entry per document type + series, comparing normalised forms.
 
-		Frappe v15 has no declarative composite-unique, so enforce it here.  The
-		DB-level index added by the patch is the real guard against races; this
-		gives the user a readable message instead of a SQL error.
+		The docname already blocks an exact repeat.  This additionally catches
+		fiscal-year variants of the same series — `BN/.FY./.#####` and
+		`BN/25-26/.#####` are different strings but resolve to the same key, so
+		allowing both would make the lookup depend on row order.
 		"""
 		if not (self.document_type and self.naming_series):
 			return
 
-		existing = frappe.db.exists(
+		mine = normalize_series(self.naming_series)
+		if not mine:
+			return
+
+		for row in frappe.get_all(
 			"Invoice Series Configuration",
-			{
+			filters={
 				"document_type": self.document_type,
-				"naming_series": self.naming_series,
 				"name": ("!=", self.name or ""),
 			},
-		)
-		if existing:
+			fields=["name", "naming_series"],
+		):
+			if normalize_series(row.naming_series) != mine:
+				continue
+
+			same = row.naming_series == self.naming_series
 			frappe.throw(
 				_("Naming Series {0} is already configured for {1} in {2}.").format(
-					frappe.bold(self.naming_series),
+					frappe.bold(self.naming_series), frappe.bold(self.document_type),
+					frappe.get_desk_link("Invoice Series Configuration", row.name),
+				)
+				if same
+				else _(
+					"Naming Series {0} resolves to the same series as {1}, already "
+					"configured for {2} in {3}. Only the fiscal year differs, and that "
+					"is matched automatically — a single entry covers every year."
+				).format(
+					frappe.bold(self.naming_series), frappe.bold(row.naming_series),
 					frappe.bold(self.document_type),
-					frappe.get_desk_link("Invoice Series Configuration", existing),
+					frappe.get_desk_link("Invoice Series Configuration", row.name),
 				),
 				title=_("Duplicate Configuration"),
 			)

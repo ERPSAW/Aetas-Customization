@@ -36,7 +36,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Must match the invoice's Naming Series exactly, e.g. <code>BN/25-26/.#####</code>",
+   "description": "The fiscal year is matched automatically — one entry covers every year. <code>BN/.FY./.#####</code> also matches <code>BN/25-26/.#####</code> and <code>BN/26-27/.#####</code>.",
    "fieldname": "naming_series",
    "fieldtype": "Data",
    "in_list_view": 1,

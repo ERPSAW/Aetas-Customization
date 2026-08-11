@@ -8,14 +8,47 @@ hardcoded switch over ~50 naming series, so every new boutique needed a code
 change.  They now come from the `Invoice Series Configuration` DocType: adding a
 series is a data entry, not a deployment.
 
-Matching is exact — the stored `naming_series` string is looked up verbatim, so
-`BN/.FY./.#####` and `BN/25-26/.#####` are separate entries.
+The fiscal-year segment is normalised away before matching, so one entry per
+boutique covers every year: `BN/.FY./.#####`, `BN/25-26/.#####` and next April's
+`BN/26-27/.#####` all resolve to the same row.  Counter width is normalised too,
+since the sales-return series use `.###` where sales use `.#####`.
 """
+
+import re
 
 import frappe
 from frappe import _
 
 CACHE_KEY = "aetas_invoice_series_config"
+
+# Fiscal-year segment in any form Frappe or the site uses:
+#   .FY.  .YYYY.  .YY.  25-26  2025-26  2025-2026
+_FISCAL_YEAR = re.compile(
+	r"(?:\.FY\.)|(?:\.YYYY\.)|(?:\.YY\.)|(?:\b\d{2,4}-\d{2,4}\b)",
+	flags=re.IGNORECASE,
+)
+# The counter: ##### or .#####
+_COUNTER = re.compile(r"\.?#+")
+
+
+def normalize_series(series: str | None) -> str:
+	"""Reduce a naming series to a fiscal-year and counter-width agnostic key.
+
+	    'BN/.FY./.#####'   -> 'BN/{FY}/{N}'
+	    'BN/25-26/.#####'  -> 'BN/{FY}/{N}'
+	    'SRBN/.FY./.###'   -> 'SRBN/{FY}/{N}'
+
+	Note this deliberately eats any `NN-NN` run, so a boutique code containing
+	one would collide.  None of the codes in use do; see the test that pins
+	every live series through this function.
+	"""
+	if not series:
+		return ""
+
+	key = _FISCAL_YEAR.sub("{FY}", series.strip().upper())
+	key = _COUNTER.sub("{N}", key)
+	key = re.sub(r"/{2,}", "/", key)  # '.FY./' -> '{FY}/' can leave '//'
+	return key.strip("/. ")
 
 # invoice fieldname -> Invoice Series Configuration fieldname
 FIELD_MAP = {
@@ -44,7 +77,7 @@ CONFIG_FIELDS = [
 
 
 def _cache_key(document_type: str, naming_series: str) -> str:
-	return f"{document_type}||{(naming_series or '').strip()}"
+	return f"{document_type}||{normalize_series(naming_series)}"
 
 
 def _build_index() -> dict:
