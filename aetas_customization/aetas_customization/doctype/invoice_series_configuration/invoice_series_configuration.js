@@ -10,7 +10,32 @@ frappe.ui.form.on("Invoice Series Configuration", {
 	refresh: function (frm) {
 		set_naming_series_options(frm);
 	},
+
+	billing_address: function (frm) {
+		set_address_display(frm, "billing_address", "billing_address_display");
+	},
+
+	shipping_address: function (frm) {
+		set_address_display(frm, "shipping_address", "shipping_address_display");
+	},
 });
+
+// Mirror the Link field's address into its read-only display field, the same way
+// Sales Invoice fills company_address_display from company_address.
+function set_address_display(frm, address_field, display_field) {
+	if (!frm.doc[address_field]) {
+		frm.set_value(display_field, "");
+		return;
+	}
+
+	frappe.call({
+		method: "frappe.contacts.doctype.address.address.get_address_display",
+		args: { address_dict: frm.doc[address_field] },
+		callback: function (r) {
+			frm.set_value(display_field, r.message || "");
+		},
+	});
+}
 
 // Turn the free-text Naming Series field into a picker of the series actually
 // configured on the target doctype.  Typing it by hand invites typos like

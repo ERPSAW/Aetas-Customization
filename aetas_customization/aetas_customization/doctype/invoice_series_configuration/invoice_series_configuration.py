@@ -3,6 +3,7 @@
 
 import frappe
 from frappe import _
+from frappe.contacts.doctype.address.address import get_address_display
 from frappe.model.document import Document
 
 from aetas_customization.aetas_customization.invoice_series_config import (
@@ -28,6 +29,21 @@ class InvoiceSeriesConfiguration(Document):
 
 	def validate(self):
 		self.validate_duplicate()
+		self.set_address_displays()
+
+	def set_address_displays(self):
+		"""Keep the read-only address text in step with its Link field.
+
+		The form script already does this as the user picks an address, but that
+		only covers the desk.  Repeating it here means an import, an API write or
+		an edited Address row can't leave stale text behind.
+		"""
+		for address_field, display_field in (
+			("billing_address", "billing_address_display"),
+			("shipping_address", "shipping_address_display"),
+		):
+			address = self.get(address_field)
+			self.set(display_field, get_address_display(address) if address else None)
 
 	def validate_duplicate(self):
 		"""One entry per document type + series, comparing normalised forms.
