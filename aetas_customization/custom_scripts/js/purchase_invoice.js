@@ -1,7 +1,12 @@
 // Pull Cost Center / Warehouse / Address from Invoice Series Configuration as
-// soon as the series is picked.  The same values are applied server side on
+// soon as the series is known.  The same values are applied server side on
 // save; doing it here just means the user sees them before saving.
-function apply_series_defaults(frm) {
+//
+// `overwrite` is true only when the user actively changed the series — then the
+// old series' values are stale and must be replaced.  On refresh it is false:
+// the series was pre-filled from the field default rather than chosen, so we
+// only fill blanks and never clobber what the user (or a mapped document) set.
+function apply_series_defaults(frm, overwrite) {
     if (frm.doc.docstatus !== 0 || !frm.doc.naming_series) return;
 
     frappe.call({
@@ -14,7 +19,9 @@ function apply_series_defaults(frm) {
             // Unconfigured series returns {} — leave the fields alone and let
             // the save-time validation be the thing that reports it.
             Object.entries(r.message || {}).forEach(([fieldname, value]) => {
-                frm.set_value(fieldname, value);
+                if (overwrite || !frm.doc[fieldname]) {
+                    frm.set_value(fieldname, value);
+                }
             });
         },
     });
@@ -41,7 +48,7 @@ function propagate_cost_center_to_items(frm) {
 
 frappe.ui.form.on('Purchase Invoice', {
     naming_series: function (frm) {
-        apply_series_defaults(frm);
+        apply_series_defaults(frm, true);
     },
 
     cost_center: function (frm) {
@@ -57,6 +64,9 @@ frappe.ui.form.on('Purchase Invoice', {
     },
 
     refresh: function (frm) {
+        // The series is pre-filled from the field default on a new invoice, so
+        // the naming_series event never fires — fill the blanks here instead.
+        apply_series_defaults(frm, false);
         propagate_cost_center_to_items(frm);
     },
 
