@@ -14,10 +14,6 @@ frappe.ui.form.on("Invoice Series Configuration", {
 	billing_address: function (frm) {
 		set_address_display(frm, "billing_address", "billing_address_display");
 	},
-
-	shipping_address: function (frm) {
-		set_address_display(frm, "shipping_address", "shipping_address_display");
-	},
 });
 
 // Mirror the Link field's address into its read-only display field, the same way

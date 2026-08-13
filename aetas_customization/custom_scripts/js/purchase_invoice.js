@@ -1,4 +1,30 @@
+// Pull Cost Center / Warehouse / Address from Invoice Series Configuration as
+// soon as the series is picked.  The same values are applied server side on
+// save; doing it here just means the user sees them before saving.
+function apply_series_defaults(frm) {
+    if (frm.doc.docstatus !== 0 || !frm.doc.naming_series) return;
+
+    frappe.call({
+        method: "aetas_customization.aetas_customization.invoice_series_config.get_series_defaults",
+        args: {
+            document_type: frm.doc.doctype,
+            naming_series: frm.doc.naming_series,
+        },
+        callback: function (r) {
+            // Unconfigured series returns {} — leave the fields alone and let
+            // the save-time validation be the thing that reports it.
+            Object.entries(r.message || {}).forEach(([fieldname, value]) => {
+                frm.set_value(fieldname, value);
+            });
+        },
+    });
+}
+
 frappe.ui.form.on('Purchase Invoice', {
+    naming_series: function (frm) {
+        apply_series_defaults(frm);
+    },
+
 	type_of_stocks:function(frm){
         if(frm.doc.type_of_stocks === "Consignment"){
               frm.set_value("update_stock",0)
