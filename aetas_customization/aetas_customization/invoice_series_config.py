@@ -56,13 +56,11 @@ FIELD_MAP = {
 		"cost_center": "cost_center",
 		"set_warehouse": "set_warehouse",
 		"company_address": "billing_address",
-		"dispatch_address_name": "shipping_address",
 	},
 	"Purchase Invoice": {
 		"cost_center": "cost_center",
 		"set_warehouse": "set_warehouse",
 		"billing_address": "billing_address",
-		"shipping_address": "shipping_address",
 	},
 }
 
@@ -72,7 +70,6 @@ CONFIG_FIELDS = [
 	"cost_center",
 	"set_warehouse",
 	"billing_address",
-	"shipping_address",
 ]
 
 
@@ -135,6 +132,33 @@ def apply_series_config(doc, method=None):
 		value = config.get(config_field)
 		if value:
 			doc.set(doc_field, value)
+
+
+@frappe.whitelist()
+def get_series_defaults(document_type: str, naming_series: str) -> dict:
+	"""The invoice fields a series would set, keyed by invoice fieldname.
+
+	Lets the form fill Cost Center / Warehouse / Address the moment the series is
+	picked, instead of leaving them blank until save.  `apply_series_config` still
+	runs server side and stays the authority — this only moves the same values
+	forward so the user can see and override them.
+
+	Returns an empty dict for an unconfigured series; the form leaves the fields
+	alone and the save-time throw remains the thing that reports it.
+	"""
+	field_map = FIELD_MAP.get(document_type)
+	if not field_map:
+		return {}
+
+	config = get_config(document_type, naming_series)
+	if not config:
+		return {}
+
+	return {
+		doc_field: config.get(config_field)
+		for doc_field, config_field in field_map.items()
+		if config.get(config_field)
+	}
 
 
 @frappe.whitelist()

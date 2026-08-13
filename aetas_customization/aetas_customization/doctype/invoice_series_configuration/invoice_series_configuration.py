@@ -38,12 +38,9 @@ class InvoiceSeriesConfiguration(Document):
 		only covers the desk.  Repeating it here means an import, an API write or
 		an edited Address row can't leave stale text behind.
 		"""
-		for address_field, display_field in (
-			("billing_address", "billing_address_display"),
-			("shipping_address", "shipping_address_display"),
-		):
-			address = self.get(address_field)
-			self.set(display_field, get_address_display(address) if address else None)
+		self.billing_address_display = (
+			get_address_display(self.billing_address) if self.billing_address else None
+		)
 
 	def validate_duplicate(self):
 		"""One entry per document type + series, comparing normalised forms.

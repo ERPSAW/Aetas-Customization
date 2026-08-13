@@ -19,9 +19,7 @@
   "section_break_addresses",
   "billing_address",
   "billing_address_display",
-  "column_break_addresses",
-  "shipping_address",
-  "shipping_address_display"
+  "column_break_addresses"
  ],
  "fields": [
   {
@@ -96,19 +94,6 @@
   {
    "fieldname": "column_break_addresses",
    "fieldtype": "Column Break"
-  },
-  {
-   "description": "Sales Invoice \u2192 Dispatch Address &nbsp;\u00b7&nbsp; Purchase Invoice \u2192 Shipping Address",
-   "fieldname": "shipping_address",
-   "fieldtype": "Link",
-   "label": "Shipping Address",
-   "options": "Address"
-  },
-  {
-   "fieldname": "shipping_address_display",
-   "fieldtype": "Small Text",
-   "label": "Address",
-   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
