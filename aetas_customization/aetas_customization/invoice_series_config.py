@@ -134,6 +134,26 @@ def apply_series_config(doc, method=None):
 			doc.set(doc_field, value)
 
 
+def propagate_cost_center_to_items(doc, method=None):
+	"""Stamp the invoice's Cost Center onto every item row.
+
+	Hooked on Sales Invoice and Purchase Invoice `validate`, deliberately *not* on
+	`before_validate` alongside `apply_series_config`: ERPNext's own validate runs
+	`set_missing_values`, which fills each row's `cost_center` from the Item
+	Default / company default (`Main - AOT`).  Anything written before that gets
+	overwritten, so the propagation has to run after it.
+
+	The parent value wins unconditionally — a row is never left on a different
+	cost center than the header it posts under.
+	"""
+	if doc.docstatus != 0 or not doc.cost_center:
+		return
+
+	for row in doc.get("items") or []:
+		if row.get("cost_center") != doc.cost_center:
+			row.cost_center = doc.cost_center
+
+
 @frappe.whitelist()
 def get_series_defaults(document_type: str, naming_series: str) -> dict:
 	"""The invoice fields a series would set, keyed by invoice fieldname.
