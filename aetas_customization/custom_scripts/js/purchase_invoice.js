@@ -20,9 +20,44 @@ function apply_series_defaults(frm) {
     });
 }
 
+// Keep every item row on the invoice's Cost Center.  The server does the same on
+// validate and stays the authority; this just means the grid doesn't sit showing
+// the company default (Main - AOT) until the user saves.
+function propagate_cost_center_to_items(frm) {
+    if (frm.doc.docstatus !== 0 || !frm.doc.cost_center) return;
+
+    let changed = false;
+    (frm.doc.items || []).forEach(row => {
+        if (row.cost_center !== frm.doc.cost_center) {
+            frappe.model.set_value(row.doctype, row.name, "cost_center", frm.doc.cost_center);
+            changed = true;
+        }
+    });
+
+    if (changed) {
+        frm.refresh_field("items");
+    }
+}
+
 frappe.ui.form.on('Purchase Invoice', {
     naming_series: function (frm) {
         apply_series_defaults(frm);
+    },
+
+    cost_center: function (frm) {
+        propagate_cost_center_to_items(frm);
+    },
+
+    items_add: function (frm, cdt, cdn) {
+        // A fresh row starts blank; fill it straight away.
+        const row = locals[cdt][cdn];
+        if (frm.doc.cost_center && row.cost_center !== frm.doc.cost_center) {
+            frappe.model.set_value(cdt, cdn, "cost_center", frm.doc.cost_center);
+        }
+    },
+
+    refresh: function (frm) {
+        propagate_cost_center_to_items(frm);
     },
 
 	type_of_stocks:function(frm){

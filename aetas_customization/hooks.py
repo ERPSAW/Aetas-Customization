@@ -267,6 +267,9 @@ doc_events = {
             "aetas_customization.aetas_customization.invoice_series_config.apply_series_config",
             "aetas_customization.aetas_customization.overrides.purchase_invoice.before_validate",
         ],
+        # After ERPNext's set_missing_values has stamped item defaults, so the
+        # header Cost Center is what the rows actually keep.
+        "validate": "aetas_customization.aetas_customization.invoice_series_config.propagate_cost_center_to_items",
         "on_submit": "aetas_customization.aetas_customization.overrides.purchase_invoice.on_submit",
         "on_cancel": "aetas_customization.aetas_customization.overrides.purchase_invoice.on_cancel",
     },
@@ -277,7 +280,12 @@ doc_events = {
             "aetas_customization.aetas_customization.invoice_series_config.apply_series_config",
             "aetas_customization.test_setup.ensure_sales_invoice_mandatory_fields_for_tests",
         ],
-        "validate": "aetas_customization.aetas_customization.overrides.sales_invoice.validate",
+        "validate": [
+            "aetas_customization.aetas_customization.overrides.sales_invoice.validate",
+            # After ERPNext's set_missing_values has stamped item defaults, so the
+            # header Cost Center is what the rows actually keep.
+            "aetas_customization.aetas_customization.invoice_series_config.propagate_cost_center_to_items",
+        ],
         "before_submit": "aetas_customization.aetas_customization.overrides.sales_invoice.before_submit",
         "on_submit": [
             "aetas_customization.aetas_customization.overrides.sales_invoice.on_submit",
