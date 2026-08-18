@@ -16,14 +16,5 @@
   "name": "Store Sales Person",
   "role_name": "Store Sales Person",
   "two_factor_auth": 0
- },
- {
-  "desk_access": 1,
-  "disabled": 0,
-  "doctype": "Role",
-  "is_custom": 1,
-  "name": "Lead Manager",
-  "role_name": "Lead Manager",
-  "two_factor_auth": 0
  }
 ]

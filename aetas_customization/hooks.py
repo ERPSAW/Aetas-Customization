@@ -54,13 +54,9 @@ fixtures = [
                     "Lead-custom_lost_reason",
                     "Lead-custom_contact_attempts",
                     "Lead-custom_allocated_store",
-                    "Customer-custom_contact",
-                    "Customer-custom_email",
-                    "Lead-custom_customer_history_tab",
-                    "Lead-custom_purchase_history_html",
-                    "Lead-custom_lead_history_html",
-                    "Lead-custom_won_details_section",
-                    "Lead-custom_won_invoice_html",
+                    "Brand-custom_last_assigned_sales_person",
+                    "Brand-custom_sales_persons",
+                    "Lead-custom_unqualified_reason",
                 ],
             ]
         ],
@@ -69,7 +65,7 @@ fixtures = [
     # BEFORE the Workflow that references them.
     {
         "dt": "Role",
-        "filters": [["name", "in", ["Lead User", "Store Sales Person", "Lead Manager"]]],
+        "filters": [["name", "in", ["Lead User"]]],
     },
     {
         "dt": "Workflow State",
@@ -133,9 +129,6 @@ fixtures = [
                     "Lead-contact_info_tab-hidden",
                     "Lead-organization_section-hidden",
                     "Lead-main-field_order",
-                    "Lead Journey-by_user-read_only",
-                    "Lead Journey-to_customer-read_only",
-                    "Lead Journey-initiated_at-default",
                 ],
             ]
         ],
@@ -263,21 +256,20 @@ doc_events = {
     "Purchase Invoice": {
         "before_validate": "aetas_customization.aetas_customization.overrides.purchase_invoice.before_validate",
         "on_submit": "aetas_customization.aetas_customization.overrides.purchase_invoice.on_submit",
-        "on_cancel": "aetas_customization.aetas_customization.overrides.purchase_invoice.on_cancel",
     },
     "Sales Invoice": {
         "before_validate": "aetas_customization.test_setup.ensure_sales_invoice_mandatory_fields_for_tests",
         "validate": "aetas_customization.aetas_customization.overrides.sales_invoice.validate",
         "before_submit": "aetas_customization.aetas_customization.overrides.sales_invoice.before_submit",
-        "on_submit": [
-            "aetas_customization.aetas_customization.overrides.sales_invoice.on_submit",
-            "aetas_customization.lead.sales_invoice_hooks.on_invoice_submit",
-        ],
+        "on_submit": "aetas_customization.aetas_customization.overrides.sales_invoice.on_submit",
         "on_cancel": "aetas_customization.aetas_customization.overrides.sales_invoice.on_cancel",
     },
     "Payment Entry": {
         "on_submit": "aetas_customization.aetas_customization.overrides.payment_entry.on_submit",
         "on_cancel": "aetas_customization.aetas_customization.overrides.payment_entry.on_cancel",
+    },
+    "Razorpay Settings": {
+        "on_update": "aetas_customization.aetas_customization.api.webhook_registration.on_update",
     },
     "Stock Entry": {
         "before_validate": "aetas_customization.aetas_customization.overrides.stock_entry.before_validate",

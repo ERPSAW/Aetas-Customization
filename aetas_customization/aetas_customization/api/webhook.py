@@ -25,6 +25,8 @@ def handle_razorpay_webhook():
 	Expected webhook signature validation via HMAC-SHA256.
 	"""
 	activity_log = None
+	body = ""
+	event = "unknown"
 	try:
 		request = frappe.request
 		body = request.get_data(as_text=True)
@@ -48,15 +50,17 @@ def handle_razorpay_webhook():
 				settings_doc = RazorpaySettings.get_settings_for_boutique(boutique_name)
 				# get_settings_for_boutique returns a dict with api_key, api_secret. 
 				# We need the webhook_secret from the actual document.
-				settings_data = frappe.db.get_value(
-					"Razorpay Settings", 
-					boutique_name, 
-					["webhook_secret", "bypass_webhook_signature"],
-					as_dict=True
+				bypass_signature = bool(
+					frappe.db.get_value(
+						"Razorpay Settings", boutique_name, "bypass_webhook_signature"
+					)
 				)
-				if settings_data:
-					webhook_secret = settings_data.webhook_secret
-					bypass_signature = bool(settings_data.bypass_webhook_signature)
+				# webhook_secret is a Password field — frappe.db.get_value returns the
+				# encrypted value, so decrypt it for HMAC signature validation.
+				from frappe.utils.password import get_decrypted_password
+				webhook_secret = get_decrypted_password(
+					"Razorpay Settings", boutique_name, "webhook_secret", raise_exception=False
+				)
 			except Exception:
 				pass
 
@@ -146,6 +150,16 @@ def handle_razorpay_webhook():
 	except Exception as e:
 		error_details = frappe.get_traceback()
 		frappe.logger().error(f"Razorpay webhook handler error: {str(e)}\nTraceback: {error_details}")
+		# Capture the raw webhook payload in the Error Log for debugging.
+		frappe.log_error(
+			title=f"Razorpay Webhook Handler Error: {event}"[:140],
+			message=(
+				f"Event: {event}\n"
+				f"Error: {str(e)}\n\n"
+				f"Raw Payload:\n{body}\n\n"
+				f"Traceback:\n{error_details}"
+			),
+		)
 		if activity_log:
 			update_activity_log(
 				activity_log,
@@ -542,8 +556,15 @@ def _create_payment_entry(arpl, source_doc, amount, razorpay_payment_id, payment
 		frappe.throw(
 			_("Could not resolve default Bank/Cash account for company {0}.").format(company)
 		)
-	
-	bank_account = bank[0].account if hasattr(bank[0], "account") else bank[0].get("account")
+
+	# frappe.get_all returns rows keyed by "name"; the mode-of-payment branch
+	# produces rows keyed by "account". Support both.
+	first = bank[0]
+	bank_account = first.get("account") or first.get("name")
+	if not bank_account:
+		frappe.throw(
+			_("Could not resolve default Bank/Cash account for company {0}.").format(company)
+		)
 	bank = {"account": bank_account}
 
 	# Fetch boutique settings for charge accounting
@@ -577,6 +598,22 @@ def _create_payment_entry(arpl, source_doc, amount, razorpay_payment_id, payment
 	pe.paid_to_account_currency = get_account_currency(bank.get("account"))
 	pe.paid_amount = amount_in_inr
 	pe.received_amount = amount_in_inr
+
+	# Set exchange rates explicitly so ERPNext's mandatory validation passes.
+	# 1.0 when the account currency matches the company currency, otherwise
+	# fetch the rate for the posting date.
+	import erpnext
+	from erpnext.setup.utils import get_exchange_rate
+
+	company_currency = erpnext.get_company_currency(company)
+
+	def _exchange_rate(account_currency):
+		if not account_currency or account_currency == company_currency:
+			return 1.0
+		return flt(get_exchange_rate(account_currency, company_currency, posting_date)) or 1.0
+
+	pe.source_exchange_rate = _exchange_rate(pe.paid_from_account_currency)
+	pe.target_exchange_rate = _exchange_rate(pe.paid_to_account_currency)
 	
 	# Option A: Deduction in Payment Entry
 	if accounting_option == "Option A" and total_fee > 0 and charge_account:

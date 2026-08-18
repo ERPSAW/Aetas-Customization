@@ -34,9 +34,23 @@ class CustomLead(Lead):
 def validate(doc, method):
     """doc_events validate — seed initial state + keep the attempt count in sync."""
     pipeline.set_initial_state(doc)
+    _fill_journey_defaults(doc)
     # Recompute from the Lead Journey rows so MANUAL grid additions are counted too
     # (not only attempts logged via the Log Attempt button).
     doc.custom_contact_attempts = len(doc.get("custom_lead_journey") or [])
+
+
+def _fill_journey_defaults(doc):
+    """Auto-fill Lead Journey rows: By User = current user, To Customer = the lead's
+    customer, timestamp = now. Runs on save so it holds regardless of the client-side
+    grid handler (which fills the same fields for immediate feedback)."""
+    for row in doc.get("custom_lead_journey") or []:
+        if not row.by_user:
+            row.by_user = frappe.session.user
+        if not row.to_customer and doc.customer:
+            row.to_customer = doc.customer
+        if not row.initiated_at:
+            row.initiated_at = frappe.utils.now()
 
 
 def after_insert(doc, method):

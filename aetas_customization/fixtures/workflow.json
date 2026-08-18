@@ -113,27 +113,9 @@
    {
     "doctype": "Workflow Transition",
     "state": "Open",
-    "action": "Mark Contacted",
-    "next_state": "In Progress",
-    "allowed": "Lead Manager",
-    "allow_self_approval": 1,
-    "condition": ""
-   },
-   {
-    "doctype": "Workflow Transition",
-    "state": "Open",
     "action": "Not Contacted",
     "next_state": "Follow Up",
     "allowed": "Lead User",
-    "allow_self_approval": 1,
-    "condition": ""
-   },
-   {
-    "doctype": "Workflow Transition",
-    "state": "Open",
-    "action": "Not Contacted",
-    "next_state": "Follow Up",
-    "allowed": "Lead Manager",
     "allow_self_approval": 1,
     "condition": ""
    },
@@ -143,15 +125,6 @@
     "action": "Mark Contacted",
     "next_state": "In Progress",
     "allowed": "Lead User",
-    "allow_self_approval": 1,
-    "condition": ""
-   },
-   {
-    "doctype": "Workflow Transition",
-    "state": "Follow Up",
-    "action": "Mark Contacted",
-    "next_state": "In Progress",
-    "allowed": "Lead Manager",
     "allow_self_approval": 1,
     "condition": ""
    },
@@ -161,15 +134,6 @@
     "action": "Mark Unqualified",
     "next_state": "Unqualified",
     "allowed": "Lead User",
-    "allow_self_approval": 1,
-    "condition": "doc.custom_contact_attempts >= 5"
-   },
-   {
-    "doctype": "Workflow Transition",
-    "state": "Follow Up",
-    "action": "Mark Unqualified",
-    "next_state": "Unqualified",
-    "allowed": "Lead Manager",
     "allow_self_approval": 1,
     "condition": "doc.custom_contact_attempts >= 5"
    },
@@ -185,27 +149,9 @@
    {
     "doctype": "Workflow Transition",
     "state": "In Progress",
-    "action": "Qualify",
-    "next_state": "Qualified",
-    "allowed": "Lead Manager",
-    "allow_self_approval": 1,
-    "condition": ""
-   },
-   {
-    "doctype": "Workflow Transition",
-    "state": "In Progress",
     "action": "Mark Unqualified",
     "next_state": "Unqualified",
     "allowed": "Lead User",
-    "allow_self_approval": 1,
-    "condition": ""
-   },
-   {
-    "doctype": "Workflow Transition",
-    "state": "In Progress",
-    "action": "Mark Unqualified",
-    "next_state": "Unqualified",
-    "allowed": "Lead Manager",
     "allow_self_approval": 1,
     "condition": ""
    },
@@ -215,15 +161,6 @@
     "action": "Start Prospecting",
     "next_state": "Prospecting",
     "allowed": "Lead User",
-    "allow_self_approval": 1,
-    "condition": ""
-   },
-   {
-    "doctype": "Workflow Transition",
-    "state": "Qualified",
-    "action": "Start Prospecting",
-    "next_state": "Prospecting",
-    "allowed": "Lead Manager",
     "allow_self_approval": 1,
     "condition": ""
    },
@@ -239,27 +176,9 @@
    {
     "doctype": "Workflow Transition",
     "state": "Prospecting",
-    "action": "Plan Visit",
-    "next_state": "Visit Planned",
-    "allowed": "Lead Manager",
-    "allow_self_approval": 1,
-    "condition": ""
-   },
-   {
-    "doctype": "Workflow Transition",
-    "state": "Prospecting",
     "action": "Mark Unqualified",
     "next_state": "Unqualified",
     "allowed": "Lead User",
-    "allow_self_approval": 1,
-    "condition": ""
-   },
-   {
-    "doctype": "Workflow Transition",
-    "state": "Prospecting",
-    "action": "Mark Unqualified",
-    "next_state": "Unqualified",
-    "allowed": "Lead Manager",
     "allow_self_approval": 1,
     "condition": ""
    },
@@ -275,27 +194,9 @@
    {
     "doctype": "Workflow Transition",
     "state": "Visit Planned",
-    "action": "Allocate",
-    "next_state": "Lead Allocation",
-    "allowed": "Lead Manager",
-    "allow_self_approval": 1,
-    "condition": ""
-   },
-   {
-    "doctype": "Workflow Transition",
-    "state": "Visit Planned",
     "action": "Mark Unqualified",
     "next_state": "Unqualified",
     "allowed": "Lead User",
-    "allow_self_approval": 1,
-    "condition": ""
-   },
-   {
-    "doctype": "Workflow Transition",
-    "state": "Visit Planned",
-    "action": "Mark Unqualified",
-    "next_state": "Unqualified",
-    "allowed": "Lead Manager",
     "allow_self_approval": 1,
     "condition": ""
    },
@@ -320,15 +221,6 @@
    {
     "doctype": "Workflow Transition",
     "state": "Lead Allocation",
-    "action": "Close Won",
-    "next_state": "Closed Won",
-    "allowed": "Lead Manager",
-    "allow_self_approval": 1,
-    "condition": ""
-   },
-   {
-    "doctype": "Workflow Transition",
-    "state": "Lead Allocation",
     "action": "Close Lost",
     "next_state": "Closed Lost",
     "allowed": "Lead User",
@@ -341,15 +233,6 @@
     "action": "Close Lost",
     "next_state": "Closed Lost",
     "allowed": "Store Sales Person",
-    "allow_self_approval": 1,
-    "condition": ""
-   },
-   {
-    "doctype": "Workflow Transition",
-    "state": "Lead Allocation",
-    "action": "Close Lost",
-    "next_state": "Closed Lost",
-    "allowed": "Lead Manager",
     "allow_self_approval": 1,
     "condition": ""
    }

@@ -267,7 +267,27 @@ def _validate_required_fields(payload: dict) -> str | None:
     if "@" not in email or "." not in email.split("@")[-1]:
         return _("Invalid email format: {0}").format(email)
 
+    # Phone must be a valid number with country code (matches Customer.custom_contact,
+    # so the downstream customer creation never fails on a bad number).
+    phone = str(payload.get("phone", "")).strip()
+    if not _is_valid_phone(phone):
+        return _(
+            "Invalid phone number: {0}. Provide a valid number with country code "
+            "(e.g. +91 9876543210)."
+        ).format(phone)
+
     return None
+
+
+def _is_valid_phone(phone: str) -> bool:
+    """Validate a phone number with country code (same rule as the Phone field)."""
+    if not phone:
+        return False
+    try:
+        frappe.utils.validate_phone_number_with_country_code(phone, "phone")
+        return True
+    except Exception:
+        return False
 
 
 def _resolve_idempotency_key(payload: dict, headers: dict) -> str:
