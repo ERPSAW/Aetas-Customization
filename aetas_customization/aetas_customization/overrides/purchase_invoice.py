@@ -1,4 +1,5 @@
 import frappe
+from frappe.contacts.doctype.address.address import render_address
 # ERPNext v15
 from erpnext.stock.doctype.serial_no.serial_no import get_available_serial_nos as get_serial_nos
 
@@ -141,3 +142,42 @@ def on_cancel(self, method):
             'purchase_invoice': self.name,
             'serial_numbers': serial_numbers,
         })
+
+
+def stash_shipping_address(self, method=None):
+    """Remember the Shipping Address the invoice arrived with.
+
+    ERPNext's set_missing_values copies billing_address into an empty
+    shipping_address (erpnext/accounts/party.py, set_address_details).  AOT
+    picks the receiving boutique by hand, so the incoming value is stashed here
+    — before validate runs — and put back by restore_shipping_address.
+
+    No docstatus guard: frappe runs before_validate and validate on save *and*
+    on submit, and set_missing_values derives the address on both.  Editing a
+    submitted invoice goes through before_update_after_submit instead, which
+    runs neither hook, so a post-submit correction is left alone.
+    """
+    self.flags.stashed_shipping_address = self.get("shipping_address") or ""
+
+
+def restore_shipping_address(self, method=None):
+    """Undo a Shipping Address that ERPNext derived during validate.
+
+    Hooked on `validate`, which runs after the controller's own validate, so
+    this gets the last word.  A value the user entered, or one carried over from
+    a mapped Purchase Order, matches what was stashed and survives untouched;
+    only a derived value is reverted.
+    """
+    if "stashed_shipping_address" not in self.flags:
+        return
+
+    stashed = self.flags.stashed_shipping_address
+    if (self.get("shipping_address") or "") == stashed:
+        return
+
+    self.shipping_address = stashed
+    # set_supplier_address only renders a display for an address that is set, so
+    # the stale one it left behind has to be cleared here.
+    self.shipping_address_display = (
+        render_address(stashed, check_permissions=False) if stashed else ""
+    )
