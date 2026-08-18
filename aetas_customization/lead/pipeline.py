@@ -47,7 +47,7 @@ def handle_state_change(doc) -> None:
 def resolve_customer(doc) -> None:
     """Link or create the Customer at lead CREATION (called from ``after_insert``).
 
-    Match priority: (1) ``Customer.custom_contact == Lead.custom_contact``,
+    Match priority: (1) ``Customer.custom_contact == Lead.mobile_no``,
     (2) ``Customer.custom_email == Lead.email_id``. If matched → link + mark the lead
     ``Existing Customer``; otherwise create a new Customer now + mark ``New``.
 
@@ -59,9 +59,9 @@ def resolve_customer(doc) -> None:
         return
     try:
         match = None
-        if doc.custom_contact:
+        if doc.mobile_no:
             match = frappe.db.get_value(
-                "Customer", {"custom_contact": doc.custom_contact}, "name"
+                "Customer", {"custom_contact": doc.mobile_no}, "name"
             )
         if not match and doc.email_id:
             match = frappe.db.get_value(
@@ -88,8 +88,22 @@ def resolve_customer(doc) -> None:
         frappe.log_error(frappe.get_traceback(), "Lead: customer resolution at creation")
 
 
+def _default_lead_source() -> str | None:
+    """Fallback source when a lead has none (Customer.custom_source is mandatory).
+    Prefer 'Others', else any existing Lead Source."""
+    if frappe.db.exists("Lead Source", "Others"):
+        return "Others"
+    return frappe.db.get_value("Lead Source", {}, "name")
+
+
 def _build_customer(doc):
-    """Build (unsaved) a Customer document from a Lead."""
+    """Build (unsaved) a Customer document from a Lead.
+
+    Customer.custom_contact is a mandatory, validated Phone field. Webhook input is
+    phone-validated up front (see api/lead_webhook.py), so a created lead's mobile is
+    a valid number; a manually-entered invalid mobile will fail here and is handled
+    non-blockingly by resolve_customer (logged; lead still created).
+    """
     customer = frappe.get_doc(
         {
             "doctype": "Customer",
@@ -98,8 +112,10 @@ def _build_customer(doc):
             "customer_group": "All Customer Groups",
             "territory": doc.territory or "All Territories",
             "lead_name": doc.name,
-            "custom_source": doc.source,
-            "custom_contact": doc.custom_contact,
+            # custom_source is mandatory on Customer — default to 'Others' if the lead
+            # has no source, so customer creation never silently fails on source.
+            "custom_source": doc.source or _default_lead_source(),
+            "custom_contact": doc.mobile_no,
             "custom_email": doc.email_id,
             "custom_client_tiers": "Potential",
             "custom_sales_person": doc.custom_sales_person,

@@ -470,7 +470,6 @@ function show_customer_search_dialog(frm) {
 
             if (data.email_id && data.email_id !== 'null') frm.set_value('email_id', data.email_id);
             if (data.mobile_no && data.mobile_no !== 'null') {
-                frm.set_value('custom_contact', data.mobile_no);
                 frm.set_value('mobile_no', data.mobile_no);
             }
             if (data.custom_sales_person && data.custom_sales_person !== 'null' && frm.fields_dict.custom_sales_person) {
