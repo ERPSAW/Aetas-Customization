@@ -46,7 +46,47 @@ function propagate_cost_center_to_items(frm) {
     }
 }
 
+// ERPNext derives the Shipping Address from the company's default addresses in
+// two places on this form: erpnext.utils.get_shipping_address() when the
+// supplier is picked (controllers/transaction.js) and the buying controller's
+// company() handler.  AOT chooses the receiving boutique by hand, so both are
+// blocked here.
+//
+// Every automatic write goes through frm.set_value, while the Link field a user
+// edits goes through frappe.model.set_value instead — so wrapping set_value on
+// this form stops the derived values and leaves manual entry untouched.
+function block_derived_shipping_address(frm) {
+    if (frm.__shipping_address_is_manual) return;
+    frm.__shipping_address_is_manual = true;
+
+    const set_value = frm.set_value.bind(frm);
+
+    // The display field is written by erpnext.utils.get_address_display right
+    // after the link changes.  Blocking it only while the link is empty keeps
+    // the manual flow intact — including the blank it writes when the user
+    // clears the address.
+    const is_derived = (fieldname, value) =>
+        fieldname === "shipping_address" ||
+        (fieldname === "shipping_address_display" && value && !frm.doc.shipping_address);
+
+    frm.set_value = function (field, value, ...rest) {
+        if (typeof field === "string") {
+            if (is_derived(field, value)) return Promise.resolve();
+        } else if ($.isPlainObject(field)) {
+            field = Object.fromEntries(
+                Object.entries(field).filter(([fieldname, v]) => !is_derived(fieldname, v))
+            );
+        }
+
+        return set_value(field, value, ...rest);
+    };
+}
+
 frappe.ui.form.on('Purchase Invoice', {
+    setup: function (frm) {
+        block_derived_shipping_address(frm);
+    },
+
     naming_series: function (frm) {
         apply_series_defaults(frm, true);
     },
