@@ -148,23 +148,33 @@ def apply_series_config(doc, method=None):
 
 
 def propagate_cost_center_to_items(doc, method=None):
-	"""Stamp the invoice's Cost Center onto every item row.
+	"""Keep item rows on the invoice's Cost Center, without burying an override.
 
-	Hooked on Sales Invoice and Purchase Invoice `validate`, deliberately *not* on
-	`before_validate` alongside `apply_series_config`: ERPNext's own validate runs
-	`set_missing_values`, which fills each row's `cost_center` from the Item
-	Default / company default (`Main - AOT`).  Anything written before that gets
-	overwritten, so the propagation has to run after it.
+	Hooked on `before_validate` right after `apply_series_config`, so the header
+	is already resolved and the rows are filled before ERPNext's
+	`set_missing_values` runs.  That ordering is what keeps the Item Default /
+	company default (`Main - AOT`) off the rows: set_missing_values only fills a
+	row's `cost_center` when it is empty, and never overwrites one that is set
+	(`accounts_controller`: `elif fieldname in ["cost_center", ...] and not
+	item.get(fieldname)`; `cost_center` is not in `force_item_fields` either).
 
-	The parent value wins unconditionally — a row is never left on a different
-	cost center than the header it posts under.
+	A row that was carrying the header value follows it when the header moves; a
+	row deliberately set to a different Cost Center is left where it is.  The
+	previously saved header is what tells the two apart — on a new invoice there
+	is none, so whatever the form put on the row stands.
 	"""
 	if doc.docstatus != 0 or not doc.cost_center:
 		return
 
+	previous = doc.get_doc_before_save()
+	was_following = previous.cost_center if previous else None
+
 	for row in doc.get("items") or []:
-		if row.get("cost_center") != doc.cost_center:
-			row.cost_center = doc.cost_center
+		current = row.get("cost_center")
+		if current and current != was_following:
+			continue
+
+		row.cost_center = doc.cost_center
 
 
 @frappe.whitelist()
