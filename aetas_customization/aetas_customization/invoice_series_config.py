@@ -8,6 +8,9 @@ hardcoded switch over ~50 naming series, so every new boutique needed a code
 change.  They now come from the `Invoice Series Configuration` DocType: adding a
 series is a data entry, not a deployment.
 
+Cost Center is the one field a hand-picked value survives on: the form fills it
+from the series, and whatever is on the invoice at save time is kept.
+
 The fiscal-year segment is normalised away before matching, so one entry per
 boutique covers every year: `BN/.FY./.#####`, `BN/25-26/.#####` and next April's
 `BN/26-27/.#####` all resolve to the same row.  Counter width is normalised too,
@@ -130,8 +133,18 @@ def apply_series_config(doc, method=None):
 
 	for doc_field, config_field in field_map.items():
 		value = config.get(config_field)
-		if value:
-			doc.set(doc_field, value)
+		if not value:
+			continue
+
+		# Cost Center is the one field the user may keep: the form fetches the
+		# series value the moment the series is picked, so anything sitting here
+		# afterwards was put there deliberately and re-deriving it would throw
+		# that away.  Warehouse and Addresses stay series-driven —
+		# india_compliance reads GSTIN and place of supply off the addresses.
+		if doc_field == "cost_center" and doc.get("cost_center"):
+			continue
+
+		doc.set(doc_field, value)
 
 
 def propagate_cost_center_to_items(doc, method=None):
