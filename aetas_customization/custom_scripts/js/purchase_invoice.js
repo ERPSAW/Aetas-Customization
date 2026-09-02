@@ -27,19 +27,31 @@ function apply_series_defaults(frm, overwrite) {
     });
 }
 
-// Keep every item row on the invoice's Cost Center.  The server does the same on
-// validate and stays the authority; this just means the grid doesn't sit showing
-// the company default (Main - AOT) until the user saves.
+// Keep item rows on the invoice's Cost Center, without burying an override.  The
+// server does the same on before_validate and stays the authority; this just
+// means the grid doesn't sit showing the company default (Main - AOT) until the
+// user saves.
+//
+// A row carrying the header value follows it when the header moves; a row set to
+// a different Cost Center by hand is left alone.  frm.__cost_center_on_rows is
+// the header value the rows were last aligned to — on the first pass after a
+// reload there is none, so only blank rows are filled and every stored override
+// survives.
 function propagate_cost_center_to_items(frm) {
     if (frm.doc.docstatus !== 0 || !frm.doc.cost_center) return;
 
+    const was_following = frm.__cost_center_on_rows;
     let changed = false;
+
     (frm.doc.items || []).forEach(row => {
-        if (row.cost_center !== frm.doc.cost_center) {
-            frappe.model.set_value(row.doctype, row.name, "cost_center", frm.doc.cost_center);
-            changed = true;
-        }
+        if (row.cost_center && row.cost_center !== was_following) return;
+        if (row.cost_center === frm.doc.cost_center) return;
+
+        frappe.model.set_value(row.doctype, row.name, "cost_center", frm.doc.cost_center);
+        changed = true;
     });
+
+    frm.__cost_center_on_rows = frm.doc.cost_center;
 
     if (changed) {
         frm.refresh_field("items");

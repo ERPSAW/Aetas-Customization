@@ -258,16 +258,16 @@ doc_events = {
             # Addresses must land before india_compliance derives company_gstin
             # and place of supply from billing_address.
             "aetas_customization.aetas_customization.invoice_series_config.apply_series_config",
+            # Straight after it, so the rows are filled before ERPNext's
+            # set_missing_values can stamp the company default on the blanks.
+            "aetas_customization.aetas_customization.invoice_series_config.propagate_cost_center_to_items",
             "aetas_customization.aetas_customization.overrides.purchase_invoice.before_validate",
             # Shipping Address is entered by hand; remember it before ERPNext
             # gets a chance to derive one.
             "aetas_customization.aetas_customization.overrides.purchase_invoice.stash_shipping_address",
         ],
         "validate": [
-            # After ERPNext's set_missing_values has stamped item defaults, so the
-            # header Cost Center is what the rows actually keep.
-            "aetas_customization.aetas_customization.invoice_series_config.propagate_cost_center_to_items",
-            # Same reason — set_missing_values is what derives the address.
+            # After ERPNext's set_missing_values, which is what derives the address.
             "aetas_customization.aetas_customization.overrides.purchase_invoice.restore_shipping_address",
         ],
         "on_submit": "aetas_customization.aetas_customization.overrides.purchase_invoice.on_submit",
@@ -277,13 +277,13 @@ doc_events = {
             # Addresses must land before india_compliance's validate derives
             # company_gstin and place of supply from company_address.
             "aetas_customization.aetas_customization.invoice_series_config.apply_series_config",
+            # Straight after it, so the rows are filled before ERPNext's
+            # set_missing_values can stamp the company default on the blanks.
+            "aetas_customization.aetas_customization.invoice_series_config.propagate_cost_center_to_items",
             "aetas_customization.test_setup.ensure_sales_invoice_mandatory_fields_for_tests",
         ],
         "validate": [
             "aetas_customization.aetas_customization.overrides.sales_invoice.validate",
-            # After ERPNext's set_missing_values has stamped item defaults, so the
-            # header Cost Center is what the rows actually keep.
-            "aetas_customization.aetas_customization.invoice_series_config.propagate_cost_center_to_items",
         ],
         "before_submit": "aetas_customization.aetas_customization.overrides.sales_invoice.before_submit",
         "on_submit": "aetas_customization.aetas_customization.overrides.sales_invoice.on_submit",
