@@ -177,6 +177,7 @@ doctype_js = {
     "Sales Invoice": "custom_scripts/js/sales_invoice.js",
     "Purchase Order": "custom_scripts/js/purchase_order.js",
     "Lead": "custom_scripts/js/lead.js",
+    "Journal Entry": "custom_scripts/js/journal_entry.js",
 }
 doctype_list_js = {"Lead": "custom_scripts/js/lead_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
