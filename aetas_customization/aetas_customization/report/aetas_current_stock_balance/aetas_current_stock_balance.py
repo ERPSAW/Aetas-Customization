@@ -116,7 +116,7 @@ def get_data(filters):
 		if not serial_nos:
 			return data
 
-	serial_nos.sort(key=lambda serial_no: serial_no.posting_date)
+	serial_nos.sort(key=lambda serial_no: serial_no.posting_date, reverse=True)
 
 	item_codes = [serial_no.item_code for serial_no in serial_nos]
 
