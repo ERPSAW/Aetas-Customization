@@ -12,13 +12,24 @@ def execute(filters=None):
 
 
 def get_posting_date_map(serial_names):
-	"""Return {serial_no: posting_date} for the inward (receipt) voucher of each serial.
+	"""Return {serial_no: posting_date} for the start of each serial's current stint in stock.
 
 	The posting date comes from the Serial and Batch Bundle, whose posting_datetime
 	is stamped from the voucher's own posting_date/posting_time — so a backdated
 	receipt reports the date the stock actually landed, not when the row was
-	inserted. Where several inward bundles exist for one serial (receipt, then a
-	repack or transfer), the earliest wins: that is when the serial entered stock.
+	inserted.
+
+	A serial can enter stock more than once: sold or consumed, then bought back in.
+	What the balance is asking about is the stock on hand *now*, so the query
+	replays every movement and keeps the last inward that took the serial from zero
+	qty to positive — not the first receipt, which may be several owners ago.
+
+	Netting per posting_datetime is what stops an internal transfer from resetting
+	the age. ERPNext writes two bundles for a Material Transfer — Outward from the
+	source warehouse, Inward to the target (see get_sle_for_target_warehouse in
+	erpnext/stock/doctype/stock_entry/stock_entry.py) — both stamped with the same
+	posting_datetime. Summed together they net to zero, the running qty never dips,
+	and the serial keeps ageing from its original receipt.
 	"""
 
 	posting_dates = {}
@@ -28,22 +39,47 @@ def get_posting_date_map(serial_names):
 
 	# 1) Serial and Batch Bundle (ERPNext v15 default)
 	bundle_rows = frappe.db.sql("""
-		SELECT sbe.serial_no AS serial_no, MIN(sbb.posting_datetime) AS posting_datetime
-		FROM `tabSerial and Batch Entry` sbe
-		INNER JOIN `tabSerial and Batch Bundle` sbb ON sbb.name = sbe.parent
-		WHERE sbe.serial_no IN %(serial_names)s
-		AND sbb.docstatus = 1
-		AND sbb.is_cancelled = 0
-		AND sbb.type_of_transaction = 'Inward'
-		AND sbb.posting_datetime IS NOT NULL
-		GROUP BY sbe.serial_no
+		WITH moves AS (
+			SELECT
+				sbe.serial_no AS serial_no,
+				sbb.posting_datetime AS posting_datetime,
+				SUM(CASE WHEN sbb.type_of_transaction = 'Inward' THEN 1 ELSE -1 END) AS net_qty
+			FROM `tabSerial and Batch Entry` sbe
+			INNER JOIN `tabSerial and Batch Bundle` sbb ON sbb.name = sbe.parent
+			WHERE sbe.serial_no IN %(serial_names)s
+			AND sbb.docstatus = 1
+			AND sbb.is_cancelled = 0
+			AND sbb.type_of_transaction IN ('Inward', 'Outward')
+			AND sbb.posting_datetime IS NOT NULL
+			GROUP BY sbe.serial_no, sbb.posting_datetime
+		),
+		walk AS (
+			SELECT
+				serial_no,
+				posting_datetime,
+				COALESCE(SUM(net_qty) OVER (
+					PARTITION BY serial_no ORDER BY posting_datetime
+					ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING
+				), 0) AS qty_before,
+				SUM(net_qty) OVER (
+					PARTITION BY serial_no ORDER BY posting_datetime
+					ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+				) AS qty_after
+			FROM moves
+		)
+		SELECT serial_no, MAX(posting_datetime) AS posting_datetime
+		FROM walk
+		WHERE qty_after > 0 AND qty_before <= 0
+		GROUP BY serial_no
 	""", {"serial_names": serial_names}, as_dict=True)
 
 	for row in bundle_rows:
 		posting_dates[row.serial_no] = getdate(row.posting_datetime)
 
 	# 2) Legacy rows that predate the bundle and still carry the plain serial_no
-	# field on the receiving voucher item.
+	# field on the receiving voucher item. These vouchers record only receipts, so
+	# there is no outward side to replay — the earliest receipt is the best guess
+	# available for a serial with no bundle at all.
 	missing = [sn for sn in serial_names if sn not in posting_dates]
 
 	if missing:
