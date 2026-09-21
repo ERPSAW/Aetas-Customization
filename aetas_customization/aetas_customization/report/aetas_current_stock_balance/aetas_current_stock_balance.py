@@ -30,7 +30,6 @@ def get_posting_date_map(serial_names):
 	erpnext/stock/doctype/stock_entry/stock_entry.py) — both stamped with the same
 	posting_datetime. Summed together they net to zero, the running qty never dips,
 	and the serial keeps ageing from its original receipt.
-	
 	"""
 
 	posting_dates = {}
