@@ -71,7 +71,7 @@ fixtures = [
     # BEFORE the Workflow that references them.
     {
         "dt": "Role",
-        "filters": [["name", "in", ["Lead User", "Store Sales Person"]]],
+        "filters": [["name", "in", ["Lead User", "Store Sales Person", "Lead Admin", "Boutique Manager", "Client relations", "Insurance Policy Manager", "insurance Report Manager"]]],
     },
     {
         "dt": "Workflow State",
