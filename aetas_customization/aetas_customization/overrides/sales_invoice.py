@@ -2,10 +2,15 @@ import json
 import frappe
 from frappe import _
 from frappe.utils import today
+from frappe.utils import flt, cint
 
 from aetas_customization.aetas_customization.api.razorpay_activity_log import (
     create_activity_log,
     update_activity_log,
+)
+
+from aetas_customization.aetas_customization.api.insurance_certificate import (
+    enqueue_insurance_certificate_generation,
 )
 
 
@@ -22,6 +27,11 @@ def validate(self, method):
     #         ),
     #         title="Day Not Started",
     #     )
+    if self.get("custom_apply_insurance") and not self.get("custom_boutique"):
+        frappe.throw(
+            frappe._("Please set 'Boutique' before applying insurance on this Sales Invoice.")
+        )
+
     if self.cost_center:
         letter_head = frappe.db.get_value(
             "Cost Center", self.cost_center, "custom_letter_head"
@@ -30,20 +40,31 @@ def validate(self, method):
             frappe.msgprint(
                 f"Letter Head must be <b>{letter_head}</b> for Cost Center - {self.cost_center}"
             )
+
+    is_exempt = has_exempt_item_sales_person(self)
     if self.grand_total >= 200000:
-        customer_details = frappe.db.get_value("Customer", self.customer, ["custom_email", "custom_date_of_birth"], as_dict= 1)
-        if not customer_details.custom_email:
+        customer_details = frappe.db.get_value("Customer", self.customer, ["custom_email", "custom_date_of_birth",  "customer_type"], as_dict= 1)
+        if not customer_details.custom_email and not is_exempt:
             frappe.throw(
                 _("Please set Email ID in Customer, in-order to Proceed with Invoice - <b>{0}</b>").format(
                     self.customer
                 )
             )
-        if not customer_details.custom_date_of_birth:
-            frappe.throw(
-                _("Please set Date of Birth in Customer, in-order to Proceed with Invoice - <b>{0}</b>").format(
-                    self.customer
-                )
+        # if not customer_details.custom_date_of_birth:
+        #     frappe.throw(
+        #         _("Please set Date of Birth in Customer, in-order to Proceed with Invoice - <b>{0}</b>").format(
+        #             self.customer
+        #         )
+        #     )
+        if customer_details.customer_type != "Company" and not customer_details.custom_date_of_birth:
+            if not has_exempt_item_sales_person(self):
+                frappe.throw(
+                    _("Please set Date of Birth in Customer, in-order to Proceed with Invoice - <b>{0}</b>").format(
+                self.customer
             )
+        )
+
+    validate_restricted_brand_contact(self, method, is_exempt=is_exempt)
 
     update_mrp_values(self)
     if self.custom_aetas_coupon_code:
@@ -79,6 +100,9 @@ def validate(self, method):
                 f"Coupon code not applicable, Reason: {coupon_data.get('message')}"
             )
         self.calculate_taxes_and_totals()
+
+    validate_payment_split(self, method)
+    validate_advance_and_loyalty_overlap(self)
 
 
 def before_submit(self, method):
@@ -141,6 +165,10 @@ def on_submit(self, method):
             0,
             update_modified=False,
         )
+
+    # Phase: Insurance Certificate generation for Watches items.
+    if self.get("custom_apply_insurance"):
+        enqueue_insurance_certificate_generation(self)
 
     if not getattr(self, "custom_aetas_coupon_code", None):
         return
@@ -794,3 +822,201 @@ def apply_advance_adjustment(si_name, adjustment_amount):
     # 3. Create accounting entries if needed
     
     return {"status": "success", "message": f"Advance of {adjustment_amount} applied"}
+
+
+PAYMENT_SPLIT_TABLE_FIELD = "custom_custom_payment_split"
+REDEMPTION_MODE_OF_PAYMENT = "Redemption"
+ADVANCE_MODE_OF_PAYMENT = "Advance"
+
+@frappe.whitelist()
+def build_payment_split_rows(advances=None, grand_total=0, loyalty_amount=0, redeem_loyalty_points=0):
+    """
+    Compute payment-split rows for a Sales Invoice: one row per advance
+    (mode fetched from its Payment Entry), one Redemption row if loyalty
+    points are being redeemed.
+
+    Args:
+        advances: list of dicts (or JSON string) with 'reference_name' and 'allocated_amount'
+        grand_total: invoice grand total
+        loyalty_amount: loyalty amount being redeemed
+        redeem_loyalty_points: 0/1
+
+    Returns:
+        list[dict]: [{"mode_of_payment": ..., "amount": ...}, ...]
+    """
+    if isinstance(advances, str):
+        advances = frappe.parse_json(advances)
+    advances = advances or []
+
+    grand_total = flt(grand_total)
+    loyalty_amount = flt(loyalty_amount)
+    redeem_loyalty_points = cint(redeem_loyalty_points)
+
+    rows = []
+    advance_total = 0.0
+
+    for adv in advances:
+        allocated_amount = flt(adv.get("allocated_amount"))
+        if allocated_amount <= 0:
+            continue
+        advance_total += allocated_amount
+
+    if advance_total > 0:
+        rows.append({"mode_of_payment": ADVANCE_MODE_OF_PAYMENT, "amount": advance_total})
+
+    if redeem_loyalty_points and loyalty_amount > 0:
+        rows.append({"mode_of_payment": REDEMPTION_MODE_OF_PAYMENT, "amount": loyalty_amount})
+
+    return rows
+
+def validate_payment_split(doc, method=None):
+    """
+    Sales Invoice validate hook.
+    - If the split table is empty, build it from scratch (covers API-created invoices).
+    - If it already has rows, only the Advance row is recalculated from the
+      current `advances` child table (advances change without a live client
+      trigger, so save is the recalculation point). Redemption and any
+      manual rows are left as-is.
+    """
+    if getattr(doc, "is_return", 0):
+        return
+    if not doc.meta.has_field(PAYMENT_SPLIT_TABLE_FIELD):
+        return
+
+    split_rows = doc.get(PAYMENT_SPLIT_TABLE_FIELD) or []
+
+    if not split_rows:
+        advances = [
+            {"reference_name": a.reference_name, "allocated_amount": a.allocated_amount}
+            for a in (doc.get("advances") or [])
+        ]
+        rows = build_payment_split_rows(
+            advances=advances,
+            grand_total=doc.grand_total,
+            loyalty_amount=doc.get("loyalty_amount"),
+            redeem_loyalty_points=doc.get("redeem_loyalty_points"),
+        )
+        for row in rows:
+            doc.append(PAYMENT_SPLIT_TABLE_FIELD, row)
+        return
+
+    # Table already populated — recompute the true current advance total.
+    current_advance_total = sum(
+        flt(a.allocated_amount) for a in (doc.get("advances") or [])
+    )
+
+    advance_row = next(
+        (r for r in split_rows if r.mode_of_payment == ADVANCE_MODE_OF_PAYMENT), None
+    )
+
+    old_advance_amount = flt(advance_row.amount) if advance_row else 0.0
+    diff = current_advance_total - old_advance_amount
+
+    if diff != 0:
+        if advance_row and current_advance_total > 0:
+            advance_row.amount = current_advance_total
+        elif current_advance_total > 0:
+            # No Advance row existed yet (e.g. first advance just added) — add one.
+            doc.append(PAYMENT_SPLIT_TABLE_FIELD, {
+                "mode_of_payment": ADVANCE_MODE_OF_PAYMENT,
+                "amount": current_advance_total,
+            })
+        elif advance_row:
+            # Advance total dropped to zero — remove the row.
+            doc.get(PAYMENT_SPLIT_TABLE_FIELD).remove(advance_row)
+
+    if doc.get("redeem_loyalty_points"):
+        redemption_total = sum(
+            flt(r.amount) for r in doc.get(PAYMENT_SPLIT_TABLE_FIELD)
+            if r.mode_of_payment == REDEMPTION_MODE_OF_PAYMENT
+        )
+        if abs(redemption_total - flt(doc.get("loyalty_amount"))) > 0.01:
+            frappe.throw(
+                frappe._("Redemption amount ({0}) must match Loyalty Amount ({1}).").format(
+                    redemption_total, doc.get("loyalty_amount")
+                )
+            )
+
+def validate_restricted_brand_contact(doc, method=None, is_exempt=None):
+    settings = frappe.get_single("Aetas Custom Setting")
+    restricted_brands = [row.item_brand for row in settings.item_brand_setting]
+
+    if not restricted_brands:
+        return
+
+    matched_brand = None
+    for item in doc.items:
+        item_brand = frappe.db.get_value("Item", item.item_code, "brand")
+        if item_brand and item_brand in restricted_brands:
+            matched_brand = item_brand
+            break
+
+    if matched_brand:
+        if is_exempt is None:
+            is_exempt = has_exempt_item_sales_person(doc)
+        if is_exempt:
+            return
+        
+        customer_contact = frappe.db.get_value("Customer", doc.customer, "custom_contact")
+        if not customer_contact:
+            frappe.throw(
+                _("Customer Contact is mandatory because this invoice "
+                  "contains an item from brand '<b>{0}</b>', which is restricted "
+                  "in Aetas Custom Setting.").format(matched_brand)
+            )
+
+def has_exempt_item_sales_person(doc):
+    """
+    True if any Sales Invoice Item row's Sales Person is in the
+    'Exempt Sales Person' list configured on Aetas Custom Setting.
+    Used to bypass the DOB-mandatory and restricted-brand-contact-mandatory
+    checks on this invoice.
+    """
+    settings = frappe.get_single("Aetas Custom Setting")
+    exempt_list = {row.sales_person for row in settings.get("exempt_sales_person")}
+    if not exempt_list:
+        return False
+
+    return any(
+        item.sales_person in exempt_list
+        for item in (doc.get("items") or [])
+        if item.sales_person
+    )
+
+def validate_advance_and_loyalty_overlap(doc):
+    """
+    Advance allocations and Loyalty Point redemption both reduce the amount
+    still owed on the invoice. If applying both together would push the
+    invoice below zero, block that combination — regardless of which one
+    the cashier set first.
+    """
+    if getattr(doc, "is_return", 0):
+        return
+
+    grand_total = flt(doc.grand_total)
+    advance_total = sum(flt(a.allocated_amount) for a in (doc.get("advances") or []))
+    loyalty_amount = flt(doc.get("loyalty_amount")) if doc.get("redeem_loyalty_points") else 0.0
+
+    if advance_total <= 0 or loyalty_amount <= 0:
+        return  # only relevant when both are actually in use together
+
+    remaining_after_advance = grand_total - advance_total
+
+    if remaining_after_advance <= 0:
+        frappe.throw(
+            _("Advance payment ({0}) already matches the Grand Total ({1}). "
+              "If you want to use Loyalty Points, please reduce the Advance amount.").format(
+                frappe.format_value(advance_total, {"fieldtype": "Currency"}),
+                frappe.format_value(grand_total, {"fieldtype": "Currency"}),
+            )
+        )
+
+    if (remaining_after_advance - loyalty_amount) < 0:
+        frappe.throw(
+            _("Advance ({0}) plus Loyalty Redemption ({1}) exceeds the Grand Total ({2}). "
+              "Please reduce the Advance amount or the Loyalty Points being redeemed.").format(
+                frappe.format_value(advance_total, {"fieldtype": "Currency"}),
+                frappe.format_value(loyalty_amount, {"fieldtype": "Currency"}),
+                frappe.format_value(remaining_after_advance, {"fieldtype": "Currency"}),
+            )
+        )

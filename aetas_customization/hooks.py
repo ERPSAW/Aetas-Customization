@@ -39,7 +39,6 @@ fixtures = [
                     "Sales Invoice-custom_lead_ref",
                     "Lead-custom_si_ref",
                     "Lead-custom_cold_description",
-                    "Lead-custom_contact",
                     "Customer-custom_customer_without_sales",
                     "Lead-custom_unqualified_reason",
                     "Customer-custom_journey",
@@ -54,9 +53,16 @@ fixtures = [
                     "Lead-custom_lost_reason",
                     "Lead-custom_contact_attempts",
                     "Lead-custom_allocated_store",
-                    "Brand-custom_last_assigned_sales_person",
-                    "Brand-custom_sales_persons",
-                    "Lead-custom_unqualified_reason",
+                    "Customer-custom_contact",
+                    "Customer-custom_email",
+                    "Lead-custom_customer_history_tab",
+                    "Lead-custom_purchase_history_html",
+                    "Lead-custom_lead_history_html",
+                    "Lead-custom_won_details_section",
+                    "Lead-custom_won_invoice_html",
+                    "Customer-custom_hobbies",
+                    "Customer-custom_interests",
+                    "Sales Invoice-custom_custom_payment_split"
                 ],
             ]
         ],
@@ -65,7 +71,7 @@ fixtures = [
     # BEFORE the Workflow that references them.
     {
         "dt": "Role",
-        "filters": [["name", "in", ["Lead User"]]],
+        "filters": [["name", "in", ["Lead User", "Store Sales Person", "Lead Admin", "Boutique Manager", "Client relations", "Insurance Policy Manager", "insurance Report Manager"]]],
     },
     {
         "dt": "Workflow State",
@@ -116,7 +122,7 @@ fixtures = [
                 "name",
                 "in",
                 [
-                    "Customer-mobile_no-in_standard_filter"
+                    "Customer-mobile_no-in_standard_filter",
                     "Purchase Invoice Item-margin_custom",
                     "Serial No-mrp",
                     "Payment Reconciliation Invoice-custom_bill_no",
@@ -129,6 +135,9 @@ fixtures = [
                     "Lead-contact_info_tab-hidden",
                     "Lead-organization_section-hidden",
                     "Lead-main-field_order",
+                    "Lead Journey-by_user-read_only",
+                    "Lead Journey-to_customer-read_only",
+                    "Lead Journey-initiated_at-default",
                 ],
             ]
         ],
@@ -154,6 +163,7 @@ fixtures = [
 # app_include_css = "/assets/aetas_customization/css/aetas_customization.css"
 # app_include_js = "/assets/aetas_customization/js/aetas_customization.js"
 
+
 # include js, css files in header of web template
 # web_include_css = "/assets/aetas_customization/css/aetas_customization.css"
 # web_include_js = "/assets/aetas_customization/js/aetas_customization.js"
@@ -177,6 +187,7 @@ doctype_js = {
     "Sales Invoice": "custom_scripts/js/sales_invoice.js",
     "Purchase Order": "custom_scripts/js/purchase_order.js",
     "Lead": "custom_scripts/js/lead.js",
+    "Customer": "custom_scripts/js/customer.js"
     "Journal Entry": "custom_scripts/js/journal_entry.js",
 }
 doctype_list_js = {"Lead": "custom_scripts/js/lead_list.js"}
@@ -208,6 +219,12 @@ doctype_list_js = {"Lead": "custom_scripts/js/lead_list.js"}
 # "methods": "aetas_customization.utils.jinja_methods",
 # "filters": "aetas_customization.utils.jinja_filters"
 # }
+
+jinja = {
+    "methods": [
+        "aetas_customization.aetas_customization.api.insurance_certificate.get_insurance_print_data",
+    ],
+}
 
 # Installation
 # ------------
@@ -280,22 +297,19 @@ doc_events = {
             "aetas_customization.aetas_customization.invoice_series_config.apply_series_config",
             # Straight after it, so the rows are filled before ERPNext's
             # set_missing_values can stamp the company default on the blanks.
-            "aetas_customization.aetas_customization.invoice_series_config.propagate_cost_center_to_items",
-            "aetas_customization.test_setup.ensure_sales_invoice_mandatory_fields_for_tests",
+            "aetas_customization.aetas_customization.invoice_series_config.propagate_cost_center_to_items"
         ],
-        "validate": [
-            "aetas_customization.aetas_customization.overrides.sales_invoice.validate",
-        ],
+        "validate": "aetas_customization.aetas_customization.overrides.sales_invoice.validate",
         "before_submit": "aetas_customization.aetas_customization.overrides.sales_invoice.before_submit",
-        "on_submit": "aetas_customization.aetas_customization.overrides.sales_invoice.on_submit",
+        "on_submit": [
+            "aetas_customization.aetas_customization.overrides.sales_invoice.on_submit",
+            "aetas_customization.lead.sales_invoice_hooks.on_invoice_submit",
+        ],
         "on_cancel": "aetas_customization.aetas_customization.overrides.sales_invoice.on_cancel",
     },
     "Payment Entry": {
         "on_submit": "aetas_customization.aetas_customization.overrides.payment_entry.on_submit",
         "on_cancel": "aetas_customization.aetas_customization.overrides.payment_entry.on_cancel",
-    },
-    "Razorpay Settings": {
-        "on_update": "aetas_customization.aetas_customization.api.webhook_registration.on_update",
     },
     "Stock Entry": {
         "before_validate": "aetas_customization.aetas_customization.overrides.stock_entry.before_validate",
@@ -318,6 +332,8 @@ doc_events = {
     "Customer": {
         "before_validate": "aetas_customization.test_setup.ensure_customer_mandatory_fields_for_tests",
         "after_insert": "aetas_customization.aetas_customization.overrides.customer.after_insert",
+        "validate": "aetas_customization.aetas_customization.overrides.customer.validate",
+
     },
     "Item Tax Template": {
         "before_validate": "aetas_customization.test_setup.normalize_item_tax_template_for_tests",
@@ -325,16 +341,12 @@ doc_events = {
     "Sales Taxes and Charges Template": {
         "before_validate": "aetas_customization.test_setup.normalize_sales_taxes_template_for_tests",
     },
+    "Razorpay Settings": {
+        "on_update": "aetas_customization.aetas_customization.api.webhook_registration.on_update",
+    },
 }
 
-
 # hooks.py
-
-# Runs after fixtures sync — backfills pipeline state + ensures CRM settings.
-after_migrate = [
-    "aetas_customization.lead.backfill.backfill_lead_pipeline_state",
-    "aetas_customization.lead.backfill.ensure_lead_crm_settings",
-]
 
 # Scheduled Tasks
 # ---------------
