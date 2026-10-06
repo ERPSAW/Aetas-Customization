@@ -276,14 +276,12 @@ doc_events = {
     },
     "Sales Invoice": {
         "before_validate": [
-             "aetas_customization.aetas_customization.invoice_series_config.apply_series_config",
+            # Addresses must land before india_compliance's validate derives
+            # company_gstin and place of supply from company_address.
+            "aetas_customization.aetas_customization.invoice_series_config.apply_series_config",
             # Straight after it, so the rows are filled before ERPNext's
             # set_missing_values can stamp the company default on the blanks.
-            "aetas_customization.aetas_customization.invoice_series_config.propagate_cost_center_to_items",
-            "aetas_customization.aetas_customization.overrides.purchase_invoice.before_validate",
-            # Shipping Address is entered by hand; remember it before ERPNext
-            # gets a chance to derive one.
-            "aetas_customization.aetas_customization.overrides.purchase_invoice.stash_shipping_address",
+            "aetas_customization.aetas_customization.invoice_series_config.propagate_cost_center_to_items"
         ],
         "validate": "aetas_customization.aetas_customization.overrides.sales_invoice.validate",
         "before_submit": "aetas_customization.aetas_customization.overrides.sales_invoice.before_submit",
