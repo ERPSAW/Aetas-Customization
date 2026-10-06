@@ -325,13 +325,6 @@ doc_events = {
 
 # hooks.py
 
-# Runs after fixtures sync — backfills pipeline state + ensures CRM settings.
-after_migrate = [
-    "aetas_customization.lead.backfill.backfill_lead_pipeline_state",
-    "aetas_customization.lead.backfill.ensure_lead_crm_settings",
-    "aetas_customization.lead.backfill.ensure_razorpay_settings_creatable",
-]
-
 # Scheduled Tasks
 # ---------------
 
