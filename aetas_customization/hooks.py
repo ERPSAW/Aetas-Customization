@@ -62,9 +62,7 @@ fixtures = [
                     "Lead-custom_won_invoice_html",
                     "Customer-custom_hobbies",
                     "Customer-custom_interests",
-                    "Sales Invoice-custom_custom_payment_split",
-                    "Customer-custom_customer_validation_detail",
-                    "Customer-custom_validation_detail"
+                    "Sales Invoice-custom_custom_payment_split"
                 ],
             ]
         ],
@@ -73,7 +71,7 @@ fixtures = [
     # BEFORE the Workflow that references them.
     {
         "dt": "Role",
-        "filters": [["name", "in", ["Lead User", "Store Sales Person","Customer Validation"]]],
+        "filters": [["name", "in", ["Lead User", "Store Sales Person"]]],
     },
     {
         "dt": "Workflow State",

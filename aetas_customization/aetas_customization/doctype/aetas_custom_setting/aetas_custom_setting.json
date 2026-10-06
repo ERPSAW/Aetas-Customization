@@ -11,7 +11,6 @@
   "insurance_print_format",
   "premium_percentage",
   "insurance_naming_series_mappings",
-  "customer_validation_field",
   "item_brand_setting",
   "exempt_sales_person",
   "insurance_certificate_logo",
@@ -43,12 +42,6 @@
    "fieldname": "premium_percentage",
    "fieldtype": "Float",
    "label": "Premium Percentage (%)"
-  },
-  {
-   "fieldname": "customer_validation_field",
-   "fieldtype": "Table",
-   "label": "Customer Validation Field",
-   "options": "Aetas Customer Validation Field"
   },
   {
    "fieldname": "item_brand_setting",
