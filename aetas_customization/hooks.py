@@ -275,7 +275,16 @@ doc_events = {
         "on_submit": "aetas_customization.aetas_customization.overrides.purchase_invoice.on_submit",
     },
     "Sales Invoice": {
-        "before_validate": "aetas_customization.test_setup.ensure_sales_invoice_mandatory_fields_for_tests",
+        "before_validate": [
+             "aetas_customization.aetas_customization.invoice_series_config.apply_series_config",
+            # Straight after it, so the rows are filled before ERPNext's
+            # set_missing_values can stamp the company default on the blanks.
+            "aetas_customization.aetas_customization.invoice_series_config.propagate_cost_center_to_items",
+            "aetas_customization.aetas_customization.overrides.purchase_invoice.before_validate",
+            # Shipping Address is entered by hand; remember it before ERPNext
+            # gets a chance to derive one.
+            "aetas_customization.aetas_customization.overrides.purchase_invoice.stash_shipping_address",
+        ],
         "validate": "aetas_customization.aetas_customization.overrides.sales_invoice.validate",
         "before_submit": "aetas_customization.aetas_customization.overrides.sales_invoice.before_submit",
         "on_submit": [
