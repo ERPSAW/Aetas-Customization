@@ -188,6 +188,7 @@ doctype_js = {
     "Purchase Order": "custom_scripts/js/purchase_order.js",
     "Lead": "custom_scripts/js/lead.js",
     "Customer": "custom_scripts/js/customer.js"
+    "Journal Entry": "custom_scripts/js/journal_entry.js",
 }
 doctype_list_js = {"Lead": "custom_scripts/js/lead_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -271,7 +272,22 @@ override_doctype_class = {
 
 doc_events = {
     "Purchase Invoice": {
-        "before_validate": "aetas_customization.aetas_customization.overrides.purchase_invoice.before_validate",
+        "before_validate": [
+            # Addresses must land before india_compliance derives company_gstin
+            # and place of supply from billing_address.
+            "aetas_customization.aetas_customization.invoice_series_config.apply_series_config",
+            # Straight after it, so the rows are filled before ERPNext's
+            # set_missing_values can stamp the company default on the blanks.
+            "aetas_customization.aetas_customization.invoice_series_config.propagate_cost_center_to_items",
+            "aetas_customization.aetas_customization.overrides.purchase_invoice.before_validate",
+            # Shipping Address is entered by hand; remember it before ERPNext
+            # gets a chance to derive one.
+            "aetas_customization.aetas_customization.overrides.purchase_invoice.stash_shipping_address",
+        ],
+        "validate": [
+            # After ERPNext's set_missing_values, which is what derives the address.
+            "aetas_customization.aetas_customization.overrides.purchase_invoice.restore_shipping_address",
+        ],
         "on_submit": "aetas_customization.aetas_customization.overrides.purchase_invoice.on_submit",
     },
     "Sales Invoice": {

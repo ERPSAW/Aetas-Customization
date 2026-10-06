@@ -8,6 +8,9 @@ hardcoded switch over ~50 naming series, so every new boutique needed a code
 change.  They now come from the `Invoice Series Configuration` DocType: adding a
 series is a data entry, not a deployment.
 
+Cost Center is the one field a hand-picked value survives on: the form fills it
+from the series, and whatever is on the invoice at save time is kept.
+
 The fiscal-year segment is normalised away before matching, so one entry per
 boutique covers every year: `BN/.FY./.#####`, `BN/25-26/.#####` and next April's
 `BN/26-27/.#####` all resolve to the same row.  Counter width is normalised too,
@@ -130,28 +133,48 @@ def apply_series_config(doc, method=None):
 
 	for doc_field, config_field in field_map.items():
 		value = config.get(config_field)
-		if value:
-			doc.set(doc_field, value)
+		if not value:
+			continue
+
+		# Cost Center is the one field the user may keep: the form fetches the
+		# series value the moment the series is picked, so anything sitting here
+		# afterwards was put there deliberately and re-deriving it would throw
+		# that away.  Warehouse and Addresses stay series-driven —
+		# india_compliance reads GSTIN and place of supply off the addresses.
+		if doc_field == "cost_center" and doc.get("cost_center"):
+			continue
+
+		doc.set(doc_field, value)
 
 
 def propagate_cost_center_to_items(doc, method=None):
-	"""Stamp the invoice's Cost Center onto every item row.
+	"""Keep item rows on the invoice's Cost Center, without burying an override.
 
-	Hooked on Sales Invoice and Purchase Invoice `validate`, deliberately *not* on
-	`before_validate` alongside `apply_series_config`: ERPNext's own validate runs
-	`set_missing_values`, which fills each row's `cost_center` from the Item
-	Default / company default (`Main - AOT`).  Anything written before that gets
-	overwritten, so the propagation has to run after it.
+	Hooked on `before_validate` right after `apply_series_config`, so the header
+	is already resolved and the rows are filled before ERPNext's
+	`set_missing_values` runs.  That ordering is what keeps the Item Default /
+	company default (`Main - AOT`) off the rows: set_missing_values only fills a
+	row's `cost_center` when it is empty, and never overwrites one that is set
+	(`accounts_controller`: `elif fieldname in ["cost_center", ...] and not
+	item.get(fieldname)`; `cost_center` is not in `force_item_fields` either).
 
-	The parent value wins unconditionally — a row is never left on a different
-	cost center than the header it posts under.
+	A row that was carrying the header value follows it when the header moves; a
+	row deliberately set to a different Cost Center is left where it is.  The
+	previously saved header is what tells the two apart — on a new invoice there
+	is none, so whatever the form put on the row stands.
 	"""
 	if doc.docstatus != 0 or not doc.cost_center:
 		return
 
+	previous = doc.get_doc_before_save()
+	was_following = previous.cost_center if previous else None
+
 	for row in doc.get("items") or []:
-		if row.get("cost_center") != doc.cost_center:
-			row.cost_center = doc.cost_center
+		current = row.get("cost_center")
+		if current and current != was_following:
+			continue
+
+		row.cost_center = doc.cost_center
 
 
 @frappe.whitelist()

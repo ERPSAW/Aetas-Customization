@@ -26,8 +26,15 @@ def _execute(filters=None, additional_table_columns=None, additional_query_colum
 	company_currency = frappe.get_cached_value("Company", filters.get("company"), "default_currency")
 
 	item_list = get_items(filters, additional_query_columns)
+	itemised_tax, tax_columns = {}, []
 	if item_list:
 		itemised_tax, tax_columns = get_tax_accounts(item_list, columns, company_currency)
+
+	# Tax columns that are "other charges" (freight, rounding, …) rather than
+	# real taxes. Collected while the rows are built and handed to
+	# split_rows_by_serial so it can rebuild Total Tax / Total Other Charges
+	# after dividing a line across its serials.
+	other_charge_fields = set()
 
 	mode_of_payments = get_mode_of_payments(set(d.parent for d in item_list))
 	so_dn_map = get_delivery_notes_against_sales_order(item_list)
@@ -126,6 +133,7 @@ def _execute(filters=None, additional_table_columns=None, additional_query_colum
 				}
 			)
 			if item_tax.get("is_other_charges"):
+				other_charge_fields.add(frappe.scrub(tax + " Amount"))
 				total_other_charges += flt(item_tax.get("tax_amount"))
 			else:
 				total_tax += flt(item_tax.get("tax_amount"))
@@ -169,7 +177,7 @@ def _execute(filters=None, additional_table_columns=None, additional_query_colum
 	# Item-wise COGS + serial rate maps.
 	purchase_maps = get_purchase_rate(data)
 	# OPTION B — split multi-serial lines into one row per serial (serial-wise COGS).
-	data = split_rows_by_serial(data, purchase_maps)
+	data = split_rows_by_serial(data, purchase_maps, tax_columns, other_charge_fields)
 	get_customer_type(data)
 	# data = merge_duplicate_items(data)
 
@@ -378,7 +386,7 @@ def get_purchase_rate(data):
 	}
 
 
-def split_rows_by_serial(data, maps):
+def split_rows_by_serial(data, maps, tax_columns=None, other_charge_fields=None):
 	"""
 	OPTION B — Serial-wise rows.
 
@@ -389,7 +397,15 @@ def split_rows_by_serial(data, maps):
 		- purchase_rate (COGS) -> that serial's own buy rate (serial_rate_map),
 		  GST excluded. Falls back to a per-serial share of the line COGS, then
 		  Item master MRP.
-		- rate / amount -> the line values split equally across the serials.
+		- rate -> unchanged, it is already a per-unit figure.
+		- amount and every tax amount -> the line values split equally across
+		  the serials, because they are whole-line figures.
+		- total_tax / total_other_charges / total / percent_gt -> rebuilt from
+		  this row's own split values, never copied from the line.
+
+	Splitting the amount but not the taxes was the old bug: a qty-3 line showed
+	one third of the amount on each row alongside the FULL line tax and total,
+	so tax and total came out 3x too high (9x in the column total).
 
 	Rows with 0 or 1 serial are kept as-is. Total rows and sub-total rows
 	(dicts without item_code / bold markers) are passed through untouched.
@@ -400,6 +416,11 @@ def split_rows_by_serial(data, maps):
 	serial_rate_map = maps.get("serial_rate_map", {})
 	serial_mrp_map = maps.get("serial_mrp_map", {})
 	item_mrp_cache = maps.get("item_mrp_cache", {})
+
+	# Fieldnames of the per-tax "Amount" columns, and which of them are other
+	# charges rather than tax — mirrors how the main loop builds the row.
+	tax_amount_fields = [frappe.scrub(tax + " Amount") for tax in (tax_columns or [])]
+	other_charge_fields = other_charge_fields or set()
 
 	new_data = []
 
@@ -456,6 +477,27 @@ def split_rows_by_serial(data, maps):
 			row["purchase_rate"] = serial_cogs
 			# Serial's own MRP where available.
 			row["mrp"] = serial_mrp_map.get((item_code, sn), d.get("mrp"))
+
+			# Taxes are charged on the whole line, so each serial carries its own
+			# share — same treatment as `amount` above. Total Tax and Total Other
+			# Charges are then re-summed from those shares so the row stays
+			# internally consistent and each column still adds up to the invoice.
+			row_total_tax = 0.0
+			row_other_charges = 0.0
+			for field in tax_amount_fields:
+				share = flt(d.get(field)) / count
+				row[field] = share
+				if field in other_charge_fields:
+					row_other_charges += share
+				else:
+					row_total_tax += share
+
+			row["total_tax"] = row_total_tax
+			row["total_other_charges"] = row_other_charges
+			# Same formula the main loop uses: net amount + tax, other charges excluded.
+			row["total"] = flt(row["amount"]) + row_total_tax
+			if "percent_gt" in d:
+				row["percent_gt"] = flt(d.get("percent_gt")) / count
 
 			new_data.append(row)
 
