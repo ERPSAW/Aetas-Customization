@@ -2,19 +2,40 @@
  {
   "desk_access": 1,
   "disabled": 0,
+  "docstatus": 0,
   "doctype": "Role",
-  "is_custom": 1,
-  "name": "Lead User",
-  "role_name": "Lead User",
+  "home_page": null,
+  "is_custom": 0,
+  "modified": "2026-09-10 13:15:07.373279",
+  "name": "Customer Validation",
+  "restrict_to_domain": null,
+  "role_name": "Customer Validation",
   "two_factor_auth": 0
  },
  {
   "desk_access": 1,
   "disabled": 0,
+  "docstatus": 0,
   "doctype": "Role",
+  "home_page": null,
   "is_custom": 1,
+  "modified": "2026-08-24 12:34:14.095981",
   "name": "Store Sales Person",
+  "restrict_to_domain": null,
   "role_name": "Store Sales Person",
+  "two_factor_auth": 0
+ },
+ {
+  "desk_access": 1,
+  "disabled": 0,
+  "docstatus": 0,
+  "doctype": "Role",
+  "home_page": null,
+  "is_custom": 1,
+  "modified": "2026-07-29 12:54:05.527682",
+  "name": "Lead User",
+  "restrict_to_domain": null,
+  "role_name": "Lead User",
   "two_factor_auth": 0
  }
 ]

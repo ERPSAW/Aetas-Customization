@@ -39,6 +39,7 @@ function apply_customer_advances_to_form(frm, rows, targetAmount) {
 
 	if (applied > 0) {
 		frm.refresh_field("advances");
+		rebuild_payment_split(frm);
 	}
 
 	return applied;
@@ -86,12 +87,20 @@ function propagate_cost_center_to_items(frm) {
 }
 
 frappe.ui.form.on('Sales Invoice', {
-    naming_series: function (frm) {
-        apply_series_defaults(frm);
-    },
+	redeem_loyalty_points: function (frm) { rebuild_payment_split(frm); },
+	loyalty_amount: function (frm) { rebuild_payment_split(frm); },
+	advances_add: function (frm) { rebuild_payment_split(frm); },
+	advances_remove: function (frm) { rebuild_payment_split(frm); },
+	naming_series: function (frm) {
+		apply_series_defaults(frm);
+	},
 
 	cost_center: function (frm) {
 		propagate_cost_center_to_items(frm);
+	},
+
+	customer: function (frm) {
+		check_restricted_brand_contact(frm);
 	},
 
 	items_add: function (frm, cdt, cdn) {
@@ -100,45 +109,87 @@ frappe.ui.form.on('Sales Invoice', {
 		if (frm.doc.cost_center && row.cost_center !== frm.doc.cost_center) {
 			frappe.model.set_value(cdt, cdn, "cost_center", frm.doc.cost_center);
 		}
+		check_restricted_brand_contact(frm);  //new
+
 	},
 
-    refresh: function (frm) {
+	//NEW
+	items_remove: function (frm) {
+		check_restricted_brand_contact(frm);
+	},
+
+	//NEW
+	item_code: function (frm, cdt, cdn) {
+		check_restricted_brand_contact(frm);
+	},
+
+	// Insurance workflow: ask for confirmation on Submit, matching the
+	// "Apply Insurance?" checkbox state. Yes -> continue submit,
+	// No -> abort and stay in Draft. Returning a Promise here is what lets
+	// us block the submit until the user answers.
+	before_submit: function (frm) {
+		return new Promise((resolve, reject) => {
+			const applyingInsurance = !!frm.doc.custom_apply_insurance;
+
+			if (applyingInsurance && !frm.doc.custom_boutique) {
+				frappe.msgprint({
+					title: __("Missing Boutique"),
+					message: __("Please set 'Boutique' before applying insurance on this Sales Invoice."),
+					indicator: "red",
+				});
+				reject();
+				return;
+			}
+
+			const message = applyingInsurance
+				? __("Are you sure you want to apply insurance for these products?")
+				: __("Are you sure you don't want to apply insurance for these products?");
+
+			frappe.confirm(
+				message,
+				() => resolve(),
+				() => reject()
+			);
+		});
+	},
+
+	refresh: function (frm) {
 		propagate_cost_center_to_items(frm);
 
-         frm.set_query('custom_aetas_coupon_code', function() {
-            return {
-                filters: {
-                    status: 'Active'
-                }
-            };
-        });
-        frappe.call({
-            method: "aetas_customization.overrides.sales_invoice.check_user_has_naming_series",
-            args: {
-                "user": frappe.session.user
-            },
-            callback: function (r) {
+		frm.set_query('custom_aetas_coupon_code', function () {
+			return {
+				filters: {
+					status: 'Active'
+				}
+			};
+		});
+		frappe.call({
+			method: "aetas_customization.overrides.sales_invoice.check_user_has_naming_series",
+			args: {
+				"user": frappe.session.user
+			},
+			callback: function (r) {
 
-                if (r.message > 0) {
-                    frappe.call({
-                        method: 'aetas_customization.overrides.sales_invoice.get_user_naming_series',
-                        args: {
-                            "user": frappe.session.user
-                        },
-                        freeze: true,
-                        callback: (r) => {
-                            if (r.message && r.message.length > 0) {
-                                let final_options = r.message.map(series => series.naming_series).join("\n");
+				if (r.message > 0) {
+					frappe.call({
+						method: 'aetas_customization.overrides.sales_invoice.get_user_naming_series',
+						args: {
+							"user": frappe.session.user
+						},
+						freeze: true,
+						callback: (r) => {
+							if (r.message && r.message.length > 0) {
+								let final_options = r.message.map(series => series.naming_series).join("\n");
 
-                                frm.set_df_property('naming_series', 'options', final_options);
-                            }
-                        },
-                    });
+								frm.set_df_property('naming_series', 'options', final_options);
+							}
+						},
+					});
 
-                }
-            }
+				}
+			}
 
-        });
+		});
 
 		// Phase 5 Sub-flow A: Advance adjustment prompt on SI creation.
 		if (frm.is_new() && frm.doc.customer && !frm.__advance_prompt_done) {
@@ -148,7 +199,7 @@ frappe.ui.form.on('Sales Invoice', {
 				args: {
 					customer: frm.doc.customer
 				},
-				callback: function(r) {
+				callback: function (r) {
 					if (r.message && r.message.balance > 0) {
 						const advance_balance = frappe.utils.flt(r.message.balance || 0);
 						const invoiceTotal = frappe.utils.flt(frm.doc.grand_total || frm.doc.rounded_total || 0);
@@ -162,7 +213,7 @@ frappe.ui.form.on('Sales Invoice', {
 								default: "Skip",
 								reqd: 1,
 							}],
-							function(values) {
+							function (values) {
 								let adjustment_amount = 0;
 
 								if (values.adjustment_option === "Full Adjust") {
@@ -172,7 +223,7 @@ frappe.ui.form.on('Sales Invoice', {
 										args: {
 											customer: frm.doc.customer
 										},
-										callback: function(r) {
+										callback: function (r) {
 											const applied = apply_customer_advances_to_form(frm, r.message || [], adjustment_amount);
 											if (applied > 0) {
 												frappe.msgprint(__("Advance of {0} applied", [format_currency(applied, "INR")]));
@@ -188,7 +239,7 @@ frappe.ui.form.on('Sales Invoice', {
 											description: __("Available advance: {0}", [format_currency(advance_balance, "INR")]),
 											reqd: 1,
 										}],
-										function(partial_values) {
+										function (partial_values) {
 											const partialAmount = frappe.utils.flt(partial_values.amount || 0);
 											if (partialAmount <= 0) {
 												frappe.msgprint(__("Amount must be greater than zero"));
@@ -207,7 +258,7 @@ frappe.ui.form.on('Sales Invoice', {
 												args: {
 													customer: frm.doc.customer
 												},
-												callback: function(r) {
+												callback: function (r) {
 													const applied = apply_customer_advances_to_form(frm, r.message || [], partialAmount);
 													if (applied > 0) {
 														frappe.msgprint(__("Advance of {0} applied", [format_currency(applied, "INR")]));
@@ -237,11 +288,11 @@ frappe.ui.form.on('Sales Invoice', {
 				args: {
 					si_name: frm.doc.name
 				},
-				callback: function(r) {
+				callback: function (r) {
 					if (r.message && r.message.length > 0) {
 						const existingKeys = get_existing_advance_keys(frm);
 						let added = 0;
-						
+
 						r.message.forEach(adv_row => {
 							const key = `Payment Entry::${adv_row.payment_entry}`;
 							if (existingKeys.has(key)) return;
@@ -254,7 +305,7 @@ frappe.ui.form.on('Sales Invoice', {
 							existingKeys.add(key);
 							added += 1;
 						});
-						
+
 						if (added > 0) {
 							frm.refresh_field("advances");
 							frappe.msgprint(__("Advances populated from customer payment history"));
@@ -265,7 +316,7 @@ frappe.ui.form.on('Sales Invoice', {
 		}
 
 		if (!frm.is_new() && frm.doc.docstatus === 1 && frm.doc.outstanding_amount > 0) {
-			frm.add_custom_button(__("Generate Payment Link"), function() {
+			frm.add_custom_button(__("Generate Payment Link"), function () {
 				frappe.prompt(
 					[{
 						fieldname: "amount",
@@ -273,7 +324,7 @@ frappe.ui.form.on('Sales Invoice', {
 						label: __("Amount (INR)"),
 						reqd: 1,
 					}],
-					function(values) {
+					function (values) {
 						frappe.call({
 							method: "aetas_customization.aetas_customization.overrides.sales_invoice.generate_payment_link_for_invoice",
 							args: {
@@ -282,7 +333,7 @@ frappe.ui.form.on('Sales Invoice', {
 							},
 							freeze: true,
 							freeze_message: __("Generating payment link…"),
-							callback: function(r) {
+							callback: function (r) {
 								if (r.message && r.message.link_url) {
 									frappe.msgprint({
 										title: __("Payment Link Generated"),
@@ -307,100 +358,100 @@ frappe.ui.form.on('Sales Invoice', {
 				);
 			}, __("Razorpay"));
 		}
-    },
-    custom_aetas_coupon_code: function (frm) {
-            frm.trigger("apply_coupon_code");
-    },
-    apply_coupon_code: function (frm) {
-        if (!frm.doc.custom_aetas_coupon_code) {
-            frm.set_value("discount_amount", 0);
-            frm.refresh_field("discount_amount");
-            return;
-        }
+	},
+	custom_aetas_coupon_code: function (frm) {
+		frm.trigger("apply_coupon_code");
+	},
+	apply_coupon_code: function (frm) {
+		if (!frm.doc.custom_aetas_coupon_code) {
+			frm.set_value("discount_amount", 0);
+			frm.refresh_field("discount_amount");
+			return;
+		}
 
-        if (frm.doc.items.length == 0) {
-            frappe.msgprint("Please add items to the invoice before applying the coupon code.");
-            frm.set_value("custom_aetas_coupon_code", "");
-            return;
-        }
+		if (frm.doc.items.length == 0) {
+			frappe.msgprint("Please add items to the invoice before applying the coupon code.");
+			frm.set_value("custom_aetas_coupon_code", "");
+			return;
+		}
 
 
-        if (frm.doc.items.filter(i => !i.item_code).length >= 1) {
-            frappe.msgprint("One or more items do not have an item code. Please correct this before applying the coupon code.");
-            frm.set_value("custom_aetas_coupon_code", "");
-            return;
-        }
+		if (frm.doc.items.filter(i => !i.item_code).length >= 1) {
+			frappe.msgprint("One or more items do not have an item code. Please correct this before applying the coupon code.");
+			frm.set_value("custom_aetas_coupon_code", "");
+			return;
+		}
 
-        if (frm.doc.items.filter(i => i.base_amount == 0.0).length >= 1) {
-            frappe.msgprint("One or more items having 0 amount. Please correct this before applying the coupon code.");
-            frm.set_value("custom_aetas_coupon_code", "");
-            return;
-        }
+		if (frm.doc.items.filter(i => i.base_amount == 0.0).length >= 1) {
+			frappe.msgprint("One or more items having 0 amount. Please correct this before applying the coupon code.");
+			frm.set_value("custom_aetas_coupon_code", "");
+			return;
+		}
 
-        if (frm.doc.custom_aetas_coupon_code && frm.doc.items.length > 0) {
-            frappe.call({
-                method: "aetas_customization.aetas_customization.overrides.sales_invoice.validate_coupon_code",
-                args: {
-                    "coupon_code": frm.doc.custom_aetas_coupon_code,
-                    "items": JSON.stringify(frm.doc.items.filter(i => i.base_amount > 0.0).map(i => ({
-                        item_code: i.item_code,
-                        base_amount: i.base_amount,
-                    }))),
-                    "grand_total": frm.doc.disable_rounded_total == 1 ? frm.doc.grand_total : frm.doc.rounded_total
-                },
-                freeze: true,
-                freeze_message: "Validating coupon, please wait...",
-                callback: function (res) {
-                    if (!res || !res.message) {
-                        // frappe.msgprint(__("No response from server"));
-                        return;
-                    }
+		if (frm.doc.custom_aetas_coupon_code && frm.doc.items.length > 0) {
+			frappe.call({
+				method: "aetas_customization.aetas_customization.overrides.sales_invoice.validate_coupon_code",
+				args: {
+					"coupon_code": frm.doc.custom_aetas_coupon_code,
+					"items": JSON.stringify(frm.doc.items.filter(i => i.base_amount > 0.0).map(i => ({
+						item_code: i.item_code,
+						base_amount: i.base_amount,
+					}))),
+					"grand_total": frm.doc.disable_rounded_total == 1 ? frm.doc.grand_total : frm.doc.rounded_total
+				},
+				freeze: true,
+				freeze_message: "Validating coupon, please wait...",
+				callback: function (res) {
+					if (!res || !res.message) {
+						// frappe.msgprint(__("No response from server"));
+						return;
+					}
 
-                    const data = res.message;
-                    // Log for debugging
-                    console.log("coupon validation result:", data);
+					const data = res.message;
+					// Log for debugging
+					console.log("coupon validation result:", data);
 
-                    // Handle different statuses from server
-                    if (data.status === "Invalid") {
-                        frm.set_value("discount_amount", 0);
-                        // frappe.msgprint({ title: __('Coupon'), message: data.message, indicator: 'red' });
-                        // optionally clear coupon_code
-                        // frm.set_value("coupon_code", null);
-                        return;
-                    }
+					// Handle different statuses from server
+					if (data.status === "Invalid") {
+						frm.set_value("discount_amount", 0);
+						// frappe.msgprint({ title: __('Coupon'), message: data.message, indicator: 'red' });
+						// optionally clear coupon_code
+						// frm.set_value("coupon_code", null);
+						return;
+					}
 
-                    if (data.status === "Inactive") {
-                        frm.set_value("discount_amount", 0);
-                        // frappe.msgprint({ title: __('Coupon'), message: data.message, indicator: 'orange' });
-                        return;
-                    }
+					if (data.status === "Inactive") {
+						frm.set_value("discount_amount", 0);
+						// frappe.msgprint({ title: __('Coupon'), message: data.message, indicator: 'orange' });
+						return;
+					}
 
-                    if (data.status === "Not Applicable") {
-                        frm.set_value("discount_amount", 0);
-                        // frappe.msgprint({ title: __('Coupon'), message: data.message, indicator: 'orange' });
-                        // you may still want to show breakdown:
-                        console.log("breakdown:", data.breakdown);
-                        return;
-                    }
+					if (data.status === "Not Applicable") {
+						frm.set_value("discount_amount", 0);
+						// frappe.msgprint({ title: __('Coupon'), message: data.message, indicator: 'orange' });
+						// you may still want to show breakdown:
+						console.log("breakdown:", data.breakdown);
+						return;
+					}
 
-                    if (data.status === "Valid") {
-                        const totalDiscount = Number(data.total_discount) || 0;
-                        // 1) Save total discount to parent field (as requested)
-                        frm.set_value("discount_amount", totalDiscount);
-                        frm.refresh_field("discount_amount");
-                        // Visual confirmation
-                        // frappe.msgprint({ title: __('Coupon'), message: __("Coupon applied. Discount: {0}", [format_currency(frm.doc.discount_amount || 0)]), indicator: 'green' });
-                        
-                    } else {
-                        // unknown status -> show message and dump response
-                        frm.set_value("discount_amount", 0);
-                        // frappe.msgprint({ title: __('Coupon'), message: __("Unhandled response: {0}", [JSON.stringify(data)]), indicator: 'orange' });
-                    }
+					if (data.status === "Valid") {
+						const totalDiscount = Number(data.total_discount) || 0;
+						// 1) Save total discount to parent field (as requested)
+						frm.set_value("discount_amount", totalDiscount);
+						frm.refresh_field("discount_amount");
+						// Visual confirmation
+						// frappe.msgprint({ title: __('Coupon'), message: __("Coupon applied. Discount: {0}", [format_currency(frm.doc.discount_amount || 0)]), indicator: 'green' });
 
-                }
-            })
-        }
-    }
+					} else {
+						// unknown status -> show message and dump response
+						frm.set_value("discount_amount", 0);
+						// frappe.msgprint({ title: __('Coupon'), message: __("Unhandled response: {0}", [JSON.stringify(data)]), indicator: 'orange' });
+					}
+
+				}
+			})
+		}
+	}
 });
 
 frappe.ui.form.on('Sales Invoice Item', {
@@ -412,6 +463,9 @@ frappe.ui.form.on('Sales Invoice Item', {
 			frappe.model.set_value(cdt, cdn, "cost_center", frm.doc.cost_center);
 		}
 	},
+	sales_person: function (frm) {
+		check_restricted_brand_contact(frm);
+	},
 });
 
 // frappe.ui.form.on('Sales Invoice Item', {
@@ -422,3 +476,109 @@ frappe.ui.form.on('Sales Invoice Item', {
 //         }
 //     }
 // });
+
+function rebuild_payment_split(frm) {
+	frappe.call({
+		method: "aetas_customization.aetas_customization.overrides.sales_invoice.build_payment_split_rows",
+		args: {
+			advances: (frm.doc.advances || []).map(a => ({
+				reference_name: a.reference_name,
+				allocated_amount: a.allocated_amount
+			})),
+			grand_total: frm.doc.grand_total,
+			loyalty_amount: frm.doc.loyalty_amount,
+			redeem_loyalty_points: frm.doc.redeem_loyalty_points
+		},
+		callback: function (r) {
+			if (!r.message) return;
+			frm.clear_table("custom_custom_payment_split");
+			r.message.forEach(row => {
+				const child = frm.add_child("custom_custom_payment_split");
+				child.mode_of_payment = row.mode_of_payment;
+				child.amount = row.amount;
+			});
+			frm.refresh_field("custom_custom_payment_split");
+		}
+	});
+}
+
+frappe.ui.form.on('Sales Invoice Advance', {
+	allocated_amount: function (frm) { rebuild_payment_split(frm); },
+});
+
+function sync_pending_payment_row(frm) {
+	const rows = frm.doc[PAYMENT_SPLIT_FIELD] || [];
+
+	let collected = 0;
+	let pending_row = null;
+	rows.forEach(r => {
+		if (r.mode_of_payment) {
+			collected += flt(r.amount);
+		} else if (!pending_row) {
+			pending_row = r; // first blank-mode row = the placeholder
+		}
+	});
+
+	const remaining = flt(frm.doc.grand_total) - collected;
+
+	if (remaining > 0.005) {
+		if (pending_row) {
+			frappe.model.set_value(pending_row.doctype, pending_row.name, "amount", remaining);
+		} else {
+			const child = frm.add_child(PAYMENT_SPLIT_FIELD);
+			child.amount = remaining;
+		}
+	} else if (pending_row) {
+		// Fully covered — drop the leftover blank row.
+		frm.get_field(PAYMENT_SPLIT_FIELD).grid.grid_rows_by_docname[pending_row.name].remove();
+	}
+
+	frm.refresh_field(PAYMENT_SPLIT_FIELD);
+}
+
+function check_restricted_brand_contact(frm) {
+	if (!frm.doc.customer || !frm.doc.items || !frm.doc.items.length) return;
+
+	frappe.call({
+		method: "frappe.client.get",
+		args: { doctype: "Aetas Custom Setting", name: "Aetas Custom Setting" },
+		callback: function (r) {
+			let restricted_brands = (r.message.item_brand_setting || []).map(row => row.item_brand);
+			if (!restricted_brands.length) return;
+
+			// Skip entirely if any item row's Sales Person is exempt —
+			// mirrors the server-side bypass in validate_restricted_brand_contact.
+			let exempt_sales_persons = (r.message.exempt_sales_person || []).map(row => row.sales_person);
+			let has_exempt_item_sales_person = exempt_sales_persons.length &&
+				(frm.doc.items || []).some(i => i.sales_person && exempt_sales_persons.includes(i.sales_person));
+			if (has_exempt_item_sales_person) return;
+
+
+			let item_codes = frm.doc.items.map(i => i.item_code).filter(Boolean);
+			if (!item_codes.length) return;
+
+			frappe.call({
+				method: "frappe.client.get_list",
+				args: {
+					doctype: "Item",
+					filters: { name: ["in", item_codes] },
+					fields: ["name", "brand"]
+				},
+				callback: function (res) {
+					let matched = res.message.find(i => restricted_brands.includes(i.brand));
+					if (matched) {
+						frappe.db.get_value("Customer", frm.doc.customer, "custom_contact").then((c) => {
+							if (!c.message.custom_contact) {
+								frappe.msgprint({
+									title: __("Contact Required"),
+									indicator: "orange",
+									message: __("This invoice contains an item from brand '<b>{0}</b>'. Customer Contact is mandatory.", [matched.brand])
+								});
+							}
+						});
+					}
+				}
+			});
+		}
+	});
+}

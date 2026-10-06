@@ -1,121 +1,125 @@
-name: CI
+name: CI (unit + e2e)
+
+# Runs the pytest unit suite and the Playwright desk E2E suite against a freshly
+# built Frappe site. NOTE: adjust the app list + branches for your setup. The Lead
+# pipeline depends on erpnext AND crm_application_plugin (Boutique, Lead Journey),
+# so both must be installed; private apps need a token (see the get-app step).
 
 on:
   push:
-    branches:
-      - dev
-      - main
-      - v-15
+    branches: [main, develop]
   pull_request:
-    branches:
-      - dev
-      - main
-      - v-15
+  workflow_dispatch:
 
 concurrency:
-  group: develop-aetas_customization-${{ github.event.number }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  tests:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-    name: Server
+  test:
+    runs-on: ubuntu-22.04
+    env:
+      SITE: test_site.localhost
+      FRAPPE_BRANCH: version-15   # match your production Frappe/ERPNext version
 
     services:
-      redis-cache:
-        image: redis:alpine
-        ports:
-          - 13000:6379
-      redis-queue:
-        image: redis:alpine
-        ports:
-          - 11000:6379
       mariadb:
         image: mariadb:10.6
         env:
-          MYSQL_ROOT_PASSWORD: root
-        ports:
-          - 3306:3306
-        options: --health-cmd="mariadb-admin ping" --health-interval=5s --health-timeout=2s --health-retries=3
+          MARIADB_ROOT_PASSWORD: root
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s --health-timeout=5s --health-retries=15
 
     steps:
-      - name: Clone
-        uses: actions/checkout@v3
+      - name: Checkout app
+        uses: actions/checkout@v4
+        with:
+          path: apps/aetas_customization
 
-      - name: Find tests
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "18" }
+
+      - name: System deps
         run: |
-          echo "Finding tests"
-          grep -rn "def test" > /dev/null
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-
-      - name: Setup Node
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18
-          check-latest: true
-
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/*requirements.txt', '**/pyproject.toml', '**/setup.py', '**/setup.cfg') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-            ${{ runner.os }}-
-
-      - name: Get yarn cache directory path
-        id: yarn-cache-dir-path
-        run: 'echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT'
-
-      - uses: actions/cache@v4
-        id: yarn-cache
-        with:
-          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
-
-      - name: Install MariaDB Client
-        run: sudo apt-get install mariadb-client
-
-      - name: Setup
-        run: |
+          sudo apt-get update
+          sudo apt-get install -y redis-server libmysqlclient-dev
+          sudo npm install -g yarn
           pip install frappe-bench
-          bench init --skip-redis-config-generation --skip-assets --python "$(which python)" ~/frappe-bench
-          mariadb --host 127.0.0.1 --port 3306 -u root -proot -e "SET GLOBAL character_set_server = 'utf8mb4'"
-          mariadb --host 127.0.0.1 --port 3306 -u root -proot -e "SET GLOBAL collation_server = 'utf8mb4_unicode_ci'"
 
-      - name: Install
-        working-directory: /home/runner/frappe-bench
+      - name: MariaDB config for Frappe
         run: |
-          bench get-app aetas_customization $GITHUB_WORKSPACE
-          bench setup requirements --dev
-          bench new-site --db-root-password root --admin-password admin test_site
-          bench --site test_site install-app aetas_customization
+          mysql -h 127.0.0.1 -u root -proot -e "SET GLOBAL character_set_server='utf8mb4'; SET GLOBAL collation_server='utf8mb4_unicode_ci';"
+
+      - name: bench init
+        run: |
+          bench init --skip-redis-config-generation --frappe-branch "$FRAPPE_BRANCH" frappe-bench
+          # move the checked-out app into the bench
+          rm -rf frappe-bench/apps/aetas_customization
+          mv apps/aetas_customization frappe-bench/apps/aetas_customization
+
+      - name: Get dependency apps
+        working-directory: frappe-bench
+        run: |
+          bench get-app --branch "$FRAPPE_BRANCH" erpnext
+          # TODO: crm_application_plugin provides Boutique + Lead Journey (required).
+          #   Private repo -> use a token:
+          #   bench get-app https://x-access-token:${{ secrets.GIT_TOKEN }}@github.com/<org>/crm_application_plugin
+          bench pip install -e apps/aetas_customization
+
+      - name: Configure hosts + redis
+        working-directory: frappe-bench
+        run: |
+          bench set-config -g redis_cache "redis://localhost:6379"
+          bench set-config -g redis_queue "redis://localhost:6379"
+          bench set-config -g redis_socketio "redis://localhost:6379"
+          echo "127.0.0.1 $SITE" | sudo tee -a /etc/hosts
+
+      - name: Create site + install apps
+        working-directory: frappe-bench
+        run: |
+          bench new-site "$SITE" --mariadb-root-password root --admin-password admin --no-mariadb-socket
+          bench --site "$SITE" install-app erpnext aetas_customization
+          bench --site "$SITE" set-config developer_mode 1
+          bench --site "$SITE" clear-cache
           bench build
-        env:
-          CI: 'Yes'
 
-      - name: Run Tests
-        working-directory: /home/runner/frappe-bench
+      - name: Unit tests (pytest)
+        working-directory: frappe-bench
+        run: bench --site "$SITE" run-tests --app aetas_customization
+
+      - name: Provision E2E users + seed data
+        working-directory: frappe-bench
         run: |
-          bench --site test_site set-config allow_tests true
-          bench --site test_site run-tests --app aetas_customization
+          bench --site "$SITE" execute aetas_customization.lead.demo_data.setup_e2e_users \
+            --kwargs "{'lead_email':'leaduser_e2e@example.com','lead_pw':'${{ secrets.E2E_LEAD_PW || 'Test@Lead#2026x' }}','store_email':'storeuser_e2e@example.com','store_pw':'${{ secrets.E2E_STORE_PW || 'Test@Store#2026x' }}'}"
+
+      - name: Start dev server (serves assets)
+        working-directory: frappe-bench
+        run: |
+          nohup bench serve --port 8000 > bench-serve.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf -H "Host: $SITE" http://localhost:8000/api/method/ping && break; sleep 2; done
+
+      - name: Playwright E2E
+        working-directory: frappe-bench/apps/aetas_customization/aetas_customization/e2e
         env:
-          TYPE: server
+          E2E_BASE_URL: http://${{ env.SITE }}:8000
+          E2E_LEAD_USER: leaduser_e2e@example.com
+          E2E_STORE_USER: storeuser_e2e@example.com
+          E2E_LEAD_PW: ${{ secrets.E2E_LEAD_PW || 'Test@Lead#2026x' }}
+          E2E_STORE_PW: ${{ secrets.E2E_STORE_PW || 'Test@Store#2026x' }}
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          npx playwright test
 
-
-
-
-
-
-
-
-
-
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frappe-bench/apps/aetas_customization/aetas_customization/e2e/playwright-report
+          retention-days: 14

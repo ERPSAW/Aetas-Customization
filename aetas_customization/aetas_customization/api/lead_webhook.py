@@ -228,16 +228,16 @@ def _authenticate(headers: dict) -> str | None:
 
 
 def _resolve_source(raw_source: object) -> str:
-    """Map a payload source to an existing Lead Source, falling back to 'Others'.
+    """Map a payload source to an existing Lead Source, falling back to '1. Walk-In'.
 
     Lead.source is a Link to the Lead Source master, so we can only assign values
     that already exist as Lead Source records; anything unknown falls back to
-    'Others' (the pre-existing default).
+    '1. Walk-In' (the pre-existing default).
     """
     source = str(raw_source or "").strip()
     if source and frappe.db.exists("Lead Source", source):
         return source
-    return "Others"
+    return "1. Walk-In"
 
 
 def _validate_required_fields(payload: dict) -> str | None:

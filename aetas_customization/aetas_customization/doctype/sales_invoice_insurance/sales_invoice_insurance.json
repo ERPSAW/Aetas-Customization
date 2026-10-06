@@ -1,0 +1,150 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2026-08-20 13:09:26.252256",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "sales_invoice",
+  "insurance_certificate",
+  "invoice_date",
+  "item_name",
+  "brand",
+  "mobile_no",
+  "email_id",
+  "column_break_lzkz",
+  "insurance_start_date",
+  "insurance_end_date",
+  "invoice_amount",
+  "premium_amount",
+  "certificate_sent"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Naming Series",
+   "options": "TVBAND-2627-#####\nTVBLR-2627-#####\nBKCIWC-2627-#####\nBKCJLC-2627-XXXXX\nBKCPAN-2627-XXXXX\nTVCHE-2627-XXXXX\nCIRAHM-2627-XXXXX\nCIRNOI-2627-XXXXX\nMBEAC-2627-XXXXX\nTVHYD-2627-XXXXX\nMOAJLC-2627-XXXXX\nMOAPAN-2627-XXXXX\nAOTCOL-2627-XXXXX\nMBPLDC-2627-XXXXX\nPLDPAN-2627-XXXXX\nMBPUNE-2627-XXXXX"
+  },
+  {
+   "fieldname": "sales_invoice",
+   "fieldtype": "Link",
+   "label": "Sales Invoice",
+   "options": "Sales Invoice",
+   "read_only": 1
+  },
+  {
+   "fieldname": "insurance_certificate",
+   "fieldtype": "Attach",
+   "label": "Insurance Certificate",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "sales_invoice.posting_date",
+   "fieldname": "invoice_date",
+   "fieldtype": "Data",
+   "label": "Invoice Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "brand",
+   "fieldtype": "Data",
+   "label": "Brand",
+   "read_only": 1
+  },
+  {
+   "fieldname": "mobile_no",
+   "fieldtype": "Data",
+   "label": "Mobile No",
+   "read_only": 1
+  },
+  {
+   "fieldname": "insurance_start_date",
+   "fieldtype": "Date",
+   "label": "Insurance Start Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "insurance_end_date",
+   "fieldtype": "Date",
+   "label": "Insurance End Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "invoice_amount",
+   "fieldtype": "Currency",
+   "label": "Invoice Amount",
+   "read_only": 1
+  },
+  {
+   "fieldname": "email_id",
+   "fieldtype": "Data",
+   "label": "Email ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Item Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_lzkz",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "premium_amount",
+   "fieldtype": "Currency",
+   "label": "Premium Amount",
+   "read_only": 1
+  },
+  {
+   "default": "Pending",
+   "fieldname": "certificate_sent",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Certificate Sent",
+   "options": "Pending\nYes\nFail",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-24 15:37:36.649899",
+ "modified_by": "Administrator",
+ "module": "Aetas Customization",
+ "name": "Sales Invoice Insurance",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "insurance Report Manager",
+   "share": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

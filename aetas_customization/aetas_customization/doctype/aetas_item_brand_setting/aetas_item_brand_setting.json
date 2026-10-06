@@ -1,0 +1,35 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-09-08 15:29:16.861980",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "item_brand"
+ ],
+ "fields": [
+  {
+   "fieldname": "item_brand",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item Brand",
+   "options": "Brand"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-08 15:31:47.663518",
+ "modified_by": "Administrator",
+ "module": "Aetas Customization",
+ "name": "Aetas Item Brand Setting",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

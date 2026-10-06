@@ -7,7 +7,17 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "mappings"
+  "mappings",
+  "insurance_print_format",
+  "premium_percentage",
+  "insurance_naming_series_mappings",
+  "customer_validation_field",
+  "item_brand_setting",
+  "exempt_sales_person",
+  "insurance_certificate_logo",
+  "insurance_certificate_signature",
+  "insurance_certificate_footer_banner",
+  "insurance_invoice_logo"
  ],
  "fields": [
   {
@@ -15,12 +25,69 @@
    "fieldtype": "Table",
    "label": "mappings",
    "options": "Userwise naming series mapping"
+  },
+  {
+   "fieldname": "insurance_print_format",
+   "fieldtype": "Link",
+   "ignore_user_permissions": 1,
+   "label": "Insurance Print Format",
+   "options": "Print Format"
+  },
+  {
+   "fieldname": "insurance_naming_series_mappings",
+   "fieldtype": "Table",
+   "label": "Insurance Naming Series Mappings",
+   "options": "Aetas Insurance Series Mapping"
+  },
+  {
+   "fieldname": "premium_percentage",
+   "fieldtype": "Float",
+   "label": "Premium Percentage (%)"
+  },
+  {
+   "fieldname": "customer_validation_field",
+   "fieldtype": "Table",
+   "label": "Customer Validation Field",
+   "options": "Aetas Customer Validation Field"
+  },
+  {
+   "fieldname": "item_brand_setting",
+   "fieldtype": "Table",
+   "label": "Item Brand Setting",
+   "options": "Aetas Item Brand Setting"
+  },
+  {
+   "fieldname": "exempt_sales_person",
+   "fieldtype": "Table",
+   "label": "Exempt Sales Person",
+   "options": "Aetas Exempt Sales Person"
+  },
+  {
+   "fieldname": "insurance_certificate_logo",
+   "fieldtype": "Attach",
+   "label": "Insurance Certificate Logo"
+  },
+  {
+   "fieldname": "insurance_certificate_signature",
+   "fieldtype": "Attach",
+   "label": "Insurance Certificate Signature"
+  },
+  {
+   "fieldname": "insurance_certificate_footer_banner",
+   "fieldtype": "Attach",
+   "label": "Insurance Certificate Footer Banner"
+  },
+  {
+   "fieldname": "insurance_invoice_logo",
+   "fieldtype": "Attach",
+   "label": "Insurance Invoice Logo"
   }
  ],
+ "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2024-08-23 18:19:41.777597",
+ "modified": "2026-10-06 13:43:51.560848",
  "modified_by": "Administrator",
  "module": "Aetas Customization",
  "name": "Aetas Custom Setting",
@@ -37,6 +104,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []
