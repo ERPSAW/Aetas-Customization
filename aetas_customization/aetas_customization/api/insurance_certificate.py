@@ -130,14 +130,12 @@ def generate_insurance_certificates(si, attach_to=None, user=None):
 
 
 def _get_contact_details(si):
-    contact_mobile = si.get("contact_mobile") or ""
-    contact_email = si.get("contact_email") or ""
-    if not contact_mobile or not contact_email:
-        customer_details = frappe.db.get_value(
-            "Customer", si.customer, ["mobile_no", "custom_email"], as_dict=True
-        ) or {}
-        contact_mobile = contact_mobile or customer_details.get("mobile_no") or ""
-        contact_email = contact_email or customer_details.get("custom_email") or ""
+    customer_details = frappe.db.get_value(
+        "Customer", si.customer, ["custom_contact", "custom_email"], as_dict=True
+    ) or {}
+    contact_mobile = customer_details.get("custom_contact") or ""
+    contact_email = customer_details.get("custom_email") or ""
+
     return contact_mobile, contact_email
 
 
