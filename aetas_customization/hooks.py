@@ -315,7 +315,6 @@ doc_events = {
         "before_validate": "aetas_customization.aetas_customization.overrides.stock_entry.before_validate",
     },
     "Item": {
-        "before_validate": "aetas_customization.test_setup.ensure_item_brand_for_tests",
         "validate": "aetas_customization.aetas_customization.overrides.item.validate",
     },
     "Item Group": {
@@ -330,16 +329,9 @@ doc_events = {
         "validate": "aetas_customization.overrides.lead.validate",
     },
     "Customer": {
-        "before_validate": "aetas_customization.test_setup.ensure_customer_mandatory_fields_for_tests",
         "after_insert": "aetas_customization.aetas_customization.overrides.customer.after_insert",
         "validate": "aetas_customization.aetas_customization.overrides.customer.validate",
 
-    },
-    "Item Tax Template": {
-        "before_validate": "aetas_customization.test_setup.normalize_item_tax_template_for_tests",
-    },
-    "Sales Taxes and Charges Template": {
-        "before_validate": "aetas_customization.test_setup.normalize_sales_taxes_template_for_tests",
     },
     "Razorpay Settings": {
         "on_update": "aetas_customization.aetas_customization.api.webhook_registration.on_update",
@@ -378,10 +370,6 @@ scheduler_events = {
     ]
 }
 
-# Testing
-# -------
-
-before_tests = "aetas_customization.test_setup.before_tests"
 
 # Overriding Methods
 # ------------------------------
