@@ -62,7 +62,8 @@ fixtures = [
                     "Lead-custom_won_invoice_html",
                     "Customer-custom_hobbies",
                     "Customer-custom_interests",
-                    "Sales Invoice-custom_custom_payment_split"
+                    "Sales Invoice-custom_custom_payment_split",
+                    "Sales Invoice-custom_apply_insurance",
                 ],
             ]
         ],
@@ -138,6 +139,10 @@ fixtures = [
                     "Lead Journey-by_user-read_only",
                     "Lead Journey-to_customer-read_only",
                     "Lead Journey-initiated_at-default",
+                    "Lead-first_name-reqd",
+                    "Lead-mobile_no-reqd",
+                    "Lead-source-reqd",
+                    "Lead-last_name-reqd"
                 ],
             ]
         ],
