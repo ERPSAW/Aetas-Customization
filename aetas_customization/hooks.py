@@ -189,6 +189,7 @@ doctype_js = {
     "Lead": "custom_scripts/js/lead.js",
     "Customer": "custom_scripts/js/customer.js",
     "Journal Entry": "custom_scripts/js/journal_entry.js",
+    "Razorpay Settings": "custom_scripts/js/razorpay_settings.js",
 }
 doctype_list_js = {"Lead": "custom_scripts/js/lead_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -309,6 +310,7 @@ doc_events = {
     },
     "Payment Entry": {
         "on_submit": "aetas_customization.aetas_customization.overrides.payment_entry.on_submit",
+        "on_update_after_submit": "aetas_customization.aetas_customization.overrides.payment_entry.on_update_after_submit",
         "on_cancel": "aetas_customization.aetas_customization.overrides.payment_entry.on_cancel",
     },
     "Stock Entry": {

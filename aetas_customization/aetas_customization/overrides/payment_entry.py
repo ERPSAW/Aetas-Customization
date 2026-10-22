@@ -38,6 +38,20 @@ def on_submit(self, method=None):
     add_payment_to_sales_invoice_split(self)
 
 
+def on_update_after_submit(self, method=None):
+    """
+    Fires when an already-submitted Payment Entry is updated in place rather
+    than resubmitted — notably the Payment Reconciliation tool, which attaches
+    new 'references' rows to an unallocated Payment Entry via doc.save()
+    (erpnext.accounts.utils.reconcile_against_document), not doc.submit().
+    on_submit() never runs for that path, so the Payment Split sync has to be
+    repeated here too. add_payment_to_sales_invoice_split() is idempotent
+    (guarded by the existing-row check), so re-running it on every subsequent
+    update is safe.
+    """
+    add_payment_to_sales_invoice_split(self)
+
+
 def on_cancel(self, method=None):
     _set_receipt_status(self.custom_advance_payment_receipt, "To Be Received", "")
 
@@ -66,15 +80,38 @@ def add_payment_to_sales_invoice_split(self):
         if not frappe.get_meta("Sales Invoice").has_field(PAYMENT_SPLIT_TABLE_FIELD):
             continue
 
+        # Skip Payment Entries that are already represented by the aggregate
+        # "Advance" row (validate_payment_split sums the Sales Invoice's own
+        # `advances` child table). When an advance Payment Entry gets
+        # allocated to this invoice, ERPNext's advance reconciliation also
+        # writes a reciprocal row into this Payment Entry's own `references`
+        # table and re-saves it — which fires on_update_after_submit above.
+        # Without this guard that reciprocal write gets logged here too,
+        # double-counting money already covered by the Advance row.
+        is_advance_allocation = frappe.db.exists(
+            "Sales Invoice Advance",
+            {
+                "parent": ref.reference_name,
+                "reference_type": "Payment Entry",
+                "reference_name": self.name,
+            },
+        )
+        if is_advance_allocation:
+            continue
+
         # Guard against this same Payment Entry being processed twice
         # (e.g. if this Payment Entry itself is later amended/resubmitted).
+        # Keyed on payment_entry rather than mode_of_payment+amount — two
+        # separate partial payments can legitimately share the same mode
+        # and amount (e.g. two Razorpay payments of the same value), and an
+        # amount-based guard would wrongly treat the second as a duplicate
+        # and silently drop it.
         already_added = frappe.db.exists(
             "Sales Invoice Payment Split",
             {
                 "parent": ref.reference_name,
                 "parentfield": PAYMENT_SPLIT_TABLE_FIELD,
-                "mode_of_payment": self.mode_of_payment,
-                "amount": allocated,
+                "payment_entry": self.name,
             },
         )
         if already_added:
@@ -93,6 +130,7 @@ def add_payment_to_sales_invoice_split(self):
             "idx": existing_count + 1,
             "mode_of_payment": self.mode_of_payment,
             "amount": allocated,
+            "payment_entry": self.name,
         })
         new_row.insert(ignore_permissions=True)
 

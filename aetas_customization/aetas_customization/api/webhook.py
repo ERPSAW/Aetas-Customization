@@ -15,6 +15,11 @@ from aetas_customization.aetas_customization.api.razorpay_activity_log import (
 	update_activity_log,
 )
 
+# Every Payment Entry created here comes exclusively from a Razorpay webhook event,
+# regardless of whether source_doc (APR or Sales Invoice) happens to have its own
+# mode_of_payment field populated.
+RAZORPAY_MODE_OF_PAYMENT = "Razor Pay"
+
 
 @frappe.whitelist(allow_guest=True)
 def handle_razorpay_webhook():
@@ -546,11 +551,10 @@ def _create_payment_entry(arpl, source_doc, amount, razorpay_payment_id, payment
 	)
 	
 	# Try specific mode of payment mapping if available in ERPNext
-	if source_doc.get("mode_of_payment"):
-		mop_bank = frappe.db.get_value("Mode of Payment Account", 
-			{"parent": source_doc.get("mode_of_payment"), "company": company}, "default_account")
-		if mop_bank:
-			bank = [{"account": mop_bank}]
+	mop_bank = frappe.db.get_value("Mode of Payment Account",
+		{"parent": RAZORPAY_MODE_OF_PAYMENT, "company": company}, "default_account")
+	if mop_bank:
+		bank = [{"account": mop_bank}]
 
 	if not bank:
 		frappe.throw(
@@ -567,8 +571,10 @@ def _create_payment_entry(arpl, source_doc, amount, razorpay_payment_id, payment
 		)
 	bank = {"account": bank_account}
 
-	# Fetch boutique settings for charge accounting
-	boutique = source_doc.get("boutique")
+	# Fetch boutique settings for charge accounting. Use the ARPL's own boutique
+	# field rather than source_doc: when reference_doctype is "Sales Invoice" the
+	# boutique field is named "custom_boutique" there, not "boutique".
+	boutique = arpl.get("boutique")
 	from payments.payment_gateways.doctype.razorpay_settings.razorpay_settings import RazorpaySettings
 	
 	# Get settings as document to ensure we have all fields including charge_account
@@ -577,6 +583,7 @@ def _create_payment_entry(arpl, source_doc, amount, razorpay_payment_id, payment
 	
 	total_fee = flt(payment_fee) / 100.0  # Convert paise to INR
 	charge_account = razorpay_settings.get("charge_account")
+	fee_deduction_account = razorpay_settings.get("fee_deduction_account")
 	accounting_option = razorpay_settings.get("charge_accounting_option")
 
 	frappe.logger().info(f"Razorpay webhook: Accounting Option={accounting_option}, Charge Account={charge_account}, Payload Fee={total_fee}")
@@ -591,7 +598,7 @@ def _create_payment_entry(arpl, source_doc, amount, razorpay_payment_id, payment
 	pe.payment_type = "Receive"
 	pe.party_type = "Customer"
 	pe.party = customer
-	pe.mode_of_payment = source_doc.get("mode_of_payment")
+	pe.mode_of_payment = RAZORPAY_MODE_OF_PAYMENT
 	pe.paid_from = party_account
 	pe.paid_to = bank.get("account")
 	pe.paid_from_account_currency = get_account_currency(party_account)
@@ -639,23 +646,38 @@ def _create_payment_entry(arpl, source_doc, amount, razorpay_payment_id, payment
 	
 	# Keep APR backlink for later traceability and APR status synchronization hooks.
 	pe.custom_advance_payment_receipt = arpl.reference_docname if arpl.reference_doctype == "Aetas Advance Payment Receipt" else None
-	
+
+	# For Sales Invoice-linked payments, allocate the Payment Entry against the
+	# invoice directly so its outstanding_amount/status update on submit.
+	# generate_payment_link_for_invoice() (overrides/sales_invoice.py) computes the
+	# invoice's remaining outstanding from exactly this references table, so without
+	# this the invoice never reflects the payment.
+	if source_doc.doctype == "Sales Invoice":
+		pe.append("references", {
+			"reference_doctype": "Sales Invoice",
+			"reference_name": source_doc.name,
+			"due_date": source_doc.get("due_date"),
+			"total_amount": source_doc.get("grand_total"),
+			"outstanding_amount": source_doc.get("outstanding_amount"),
+			"allocated_amount": min(flt(pe.paid_amount), flt(source_doc.get("outstanding_amount") or 0)),
+		})
+
 	pe.insert(ignore_permissions=True)
 	pe.submit()
 
 	# Option B: Separate Journal Entry (Post-Submit)
 	if accounting_option == "Option B" and total_fee > 0 and charge_account:
-		_create_fee_journal_entry(pe, total_fee, charge_account, boutique)
-	
+		_create_fee_journal_entry(pe, total_fee, charge_account, fee_deduction_account, boutique)
+
 	return pe
 
 
-def _create_fee_journal_entry(pe, total_fee, charge_account, boutique):
+def _create_fee_journal_entry(pe, total_fee, charge_account, fee_deduction_account, boutique):
 	"""Creates a separate Journal Entry for Razorpay fees (Option B)."""
 	cost_center = None
 	if boutique:
 		cost_center = frappe.db.get_value("Boutique", boutique, "boutique_cost_center")
-	
+
 	if not cost_center:
 		cost_center = frappe.get_cached_value("Company", pe.company, "cost_center")
 
@@ -664,15 +686,17 @@ def _create_fee_journal_entry(pe, total_fee, charge_account, boutique):
 	je.posting_date = pe.posting_date
 	je.voucher_type = "Journal Entry"
 	je.multi_currency = 1
-	
+
 	je.append("accounts", {
 		"account": charge_account,
 		"debit_in_account_currency": total_fee,
 		"cost_center": cost_center
 	})
-	
+
+	# Falls back to the Payment Entry's own bank/cash account when the boutique's
+	# Razorpay Settings doesn't configure a dedicated Fee Deduction Account.
 	je.append("accounts", {
-		"account": pe.paid_to,
+		"account": fee_deduction_account or pe.paid_to,
 		"credit_in_account_currency": total_fee,
 		"cost_center": cost_center
 	})
@@ -680,7 +704,7 @@ def _create_fee_journal_entry(pe, total_fee, charge_account, boutique):
 	je.user_remark = f"Razorpay Transaction Fee for {pe.name} ({pe.reference_no})"
 	je.insert(ignore_permissions=True)
 	je.submit()
-	
+
 	return je
 
 
