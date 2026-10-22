@@ -294,10 +294,16 @@ class TestGeneratePaymentLinkSI(FrappeTestCase):
 		with self.assertRaises(frappe.ValidationError):
 			self._call_si(amount=9999.0)
 
-	def test_si_one_time_use_guard_raises(self):
-		"""TEST-005 row 3 (SI): ValidationError when Paid tracker exists."""
+	def test_si_second_partial_payment_allowed_while_outstanding_remains(self):
+		"""A prior Paid payment link tracker must not block a further partial
+		payment as long as the invoice isn't fully paid yet."""
+		result = self._call_si(amount=1000.0, grand_total=4000.0, paid=2000.0, paid_tracker_exists=True)
+		self.assertEqual(result["amount"], 1000.0)
+
+	def test_si_blocked_when_fully_paid(self):
+		"""ValidationError once the invoice's outstanding amount has reached zero."""
 		with self.assertRaises(frappe.ValidationError):
-			self._call_si(amount=1000.0, paid_tracker_exists=True)
+			self._call_si(amount=500.0, grand_total=4000.0, paid=4000.0, paid_tracker_exists=True)
 
 	def test_si_no_boutique_raises(self):
 		"""SI endpoint blocks if custom_boutique is not set."""

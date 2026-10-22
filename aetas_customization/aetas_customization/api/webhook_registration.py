@@ -22,6 +22,7 @@ Design notes:
 import frappe
 from frappe import _
 from frappe.utils import get_url, now_datetime
+from frappe.utils.password import remove_encrypted_password, set_encrypted_password
 
 from aetas_customization.aetas_customization.api.razorpay_activity_log import (
     create_activity_log,
@@ -99,6 +100,24 @@ def on_update(doc, method=None):
         register_webhook(doc)
 
 
+# ── Manual controls (Register/Unregister Webhook buttons) ──────────────────────
+
+@frappe.whitelist()
+def register_webhook_manually(razorpay_settings):
+    """Called from the 'Register Webhook' button on the Razorpay Settings form."""
+    doc = frappe.get_doc("Razorpay Settings", razorpay_settings)
+    doc.check_permission("write")
+    register_webhook(doc)
+
+
+@frappe.whitelist()
+def unregister_webhook_manually(razorpay_settings):
+    """Called from the 'Unregister Webhook' button on the Razorpay Settings form."""
+    doc = frappe.get_doc("Razorpay Settings", razorpay_settings)
+    doc.check_permission("write")
+    deregister_webhook(doc)
+
+
 # ── Registration ───────────────────────────────────────────────────────────────
 
 def register_webhook(doc):
@@ -137,7 +156,13 @@ def register_webhook(doc):
 
         doc.db_set("webhook_id", webhook_id, update_modified=False)
         doc.db_set("webhook_url", url, update_modified=False)
-        doc.db_set("webhook_secret", secret, update_modified=False)
+        # webhook_secret is a Password field: writing it via db_set() only touches
+        # the main table column, bypassing the __Auth table that get_decrypted_password()
+        # (used for HMAC validation in webhook.py) actually reads from. That mismatch is
+        # what caused every inbound webhook to fail signature validation. Store it the
+        # same way Document.save() does: encrypted in __Auth, masked in the main column.
+        set_encrypted_password("Razorpay Settings", doc.name, secret, "webhook_secret")
+        doc.db_set("webhook_secret", "*" * len(secret), update_modified=False)
         doc.db_set("webhook_status", "Active", update_modified=False)
         doc.db_set("webhook_registered_on", now_datetime(), update_modified=False)
         doc.db_set("webhook_last_error", None, update_modified=False)
@@ -242,6 +267,8 @@ def _try_hard_delete(doc, webhook_id):
 
 def _clear_local_webhook(doc, status="Not Registered"):
     doc.db_set("webhook_id", None, update_modified=False)
+    doc.db_set("webhook_secret", None, update_modified=False)
+    remove_encrypted_password(doc.doctype, doc.name, "webhook_secret")
     doc.db_set("webhook_status", status, update_modified=False)
     doc.db_set("webhook_registered_on", None, update_modified=False)
     doc.db_set("webhook_last_error", None, update_modified=False)

@@ -548,14 +548,6 @@ def generate_payment_link_for_invoice(si_name, amount):
     amount = flt(amount)
     si = frappe.get_doc("Sales Invoice", si_name)
 
-    if frappe.db.exists(
-        "Aetas Razorpay Payment Link",
-        {"reference_docname": si_name, "status": "Paid"},
-    ):
-        frappe.throw(
-            _("A payment has already been completed for this Sales Invoice.")
-        )
-
     # Compute outstanding from submitted Payment Entry References
     paid = frappe.db.sql(
         """
@@ -570,6 +562,8 @@ def generate_payment_link_for_invoice(si_name, amount):
     )[0][0]
     outstanding = flt(si.grand_total) - flt(paid)
 
+    if outstanding <= 0:
+        frappe.throw(_("This Sales Invoice has already been fully paid."))
     if amount <= 0:
         frappe.throw(_("Payment amount must be greater than zero."))
     if amount > outstanding:

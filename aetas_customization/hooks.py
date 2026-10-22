@@ -62,7 +62,8 @@ fixtures = [
                     "Lead-custom_won_invoice_html",
                     "Customer-custom_hobbies",
                     "Customer-custom_interests",
-                    "Sales Invoice-custom_custom_payment_split"
+                    "Sales Invoice-custom_custom_payment_split",
+                    "Sales Invoice-custom_apply_insurance",
                 ],
             ]
         ],
@@ -138,6 +139,10 @@ fixtures = [
                     "Lead Journey-by_user-read_only",
                     "Lead Journey-to_customer-read_only",
                     "Lead Journey-initiated_at-default",
+                    "Lead-first_name-reqd",
+                    "Lead-mobile_no-reqd",
+                    "Lead-source-reqd",
+                    "Lead-last_name-reqd"
                 ],
             ]
         ],
@@ -189,6 +194,7 @@ doctype_js = {
     "Lead": "custom_scripts/js/lead.js",
     "Customer": "custom_scripts/js/customer.js",
     "Journal Entry": "custom_scripts/js/journal_entry.js",
+    "Razorpay Settings": "custom_scripts/js/razorpay_settings.js",
 }
 doctype_list_js = {"Lead": "custom_scripts/js/lead_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -309,6 +315,7 @@ doc_events = {
     },
     "Payment Entry": {
         "on_submit": "aetas_customization.aetas_customization.overrides.payment_entry.on_submit",
+        "on_update_after_submit": "aetas_customization.aetas_customization.overrides.payment_entry.on_update_after_submit",
         "on_cancel": "aetas_customization.aetas_customization.overrides.payment_entry.on_cancel",
     },
     "Stock Entry": {
