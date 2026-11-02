@@ -144,7 +144,54 @@ def apply_series_config(doc, method=None):
 		if doc_field == "cost_center" and doc.get("cost_center"):
 			continue
 
+		if doc.get(doc_field) == value:
+			continue
+
 		doc.set(doc_field, value)
+		_refresh_fetched_fields(doc, doc_field)
+
+
+def _refresh_fetched_fields(doc, link_field):
+	"""Re-run `fetch_from` for fields hanging off a link we just changed.
+
+	Frappe resolves `fetch_from` in `_validate_links`, which runs *before*
+	`before_validate`.  So when this hook swaps the address, `company_gstin`
+	(`fetch_from: company_address.gstin`) would keep the GSTIN of whatever address
+	was on the invoice before — e.g. the company default in Tamil Nadu (33...) on
+	a Hyderabad invoice that should carry 36....
+
+	Place of Supply goes the same way: on a retail invoice with no customer
+	address india_compliance derives it from company_gstin, so if it still points
+	at the old GSTIN's state it is cleared and india_compliance's before_validate
+	(which runs after this app's) derives it again from the corrected GSTIN.
+	"""
+	fields_to_fetch = doc.meta.get_fields_to_fetch(link_field)
+	if not fields_to_fetch:
+		return
+
+	link_df = doc.meta.get_field(link_field)
+	values = frappe.db.get_value(
+		link_df.options,
+		doc.get(link_field),
+		[df.fetch_from.split(".")[-1] for df in fields_to_fetch],
+		as_dict=True,
+	)
+	if not values:
+		return
+
+	old_gstin = doc.get("company_gstin")
+	for df in fields_to_fetch:
+		doc.set_fetch_from_value(link_df.options, df, values)
+
+	new_gstin = doc.get("company_gstin")
+	place_of_supply = doc.get("place_of_supply")
+	if (
+		old_gstin
+		and new_gstin != old_gstin
+		and place_of_supply
+		and place_of_supply[:2] == old_gstin[:2]
+	):
+		doc.place_of_supply = None
 
 
 def propagate_cost_center_to_items(doc, method=None):
