@@ -266,7 +266,7 @@ def get_unconfigured_series(from_date: str | None = None) -> dict:
 	for doctype in FIELD_MAP:
 		used = frappe.get_all(
 			doctype,
-			fields=["naming_series", "count(name) as count"],
+			fields=["naming_series", {"COUNT": "name", "as": "count"}],
 			filters={"creation": (">", from_date), "naming_series": ("is", "set")},
 			group_by="naming_series",
 			order_by="count desc",

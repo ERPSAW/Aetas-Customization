@@ -516,7 +516,7 @@ def get_customer_type(data):
 	invoice_counts = frappe.db.get_all(
 		"Sales Invoice",
 		filters={"customer": ["in", customers]},
-		fields=["customer", "count(name) as invoice_count"],
+		fields=["customer", {"COUNT": "name", "as": "invoice_count"}],
 		group_by="customer"
 	)
 
