@@ -121,6 +121,85 @@ def get_posting_date_map(serial_names):
 	return posting_dates
 
 
+def get_serial_entries_map(serial_nos):
+	"""Return {serial_no: [entry, ...]} for every Purchase Invoice, Debit Note and
+	Consignment Material Receipt the serial appears on, oldest first.
+
+	Entries are ordered by the voucher's own posting_date/posting_time, so a
+	backdated document sits where it happened, not where it was keyed in.
+	creation only breaks a tie between two vouchers posted at the same moment.
+
+	A serial can sit on a voucher through the plain serial_no field (older rows,
+	and Purchase Invoices that do not update stock) or through a Serial and Batch
+	Bundle, so both are read.
+	"""
+
+	# Keyed in upper case: the serial_no text field on a voucher row is free text,
+	# and MariaDB matched it case-insensitively when the serial was received.
+	serials_by_key = {serial_no.name.upper(): serial_no for serial_no in serial_nos}
+	entries = {}
+
+	bundle_serials = {}
+	for row in frappe.db.sql("""
+		SELECT parent, serial_no
+		FROM `tabSerial and Batch Entry`
+		WHERE serial_no IN %(serial_names)s
+	""", {"serial_names": [serial_no.name for serial_no in serial_nos]}, as_dict=True):
+		bundle_serials.setdefault(row.parent, []).append(row.serial_no)
+
+	purchase_rows = frappe.db.sql("""
+		SELECT
+			pi.name AS voucher_no,
+			IF(pi.is_return = 1, 'Return', 'Purchase') AS entry_type,
+			pi.update_stock AS is_inward,
+			TIMESTAMP(pi.posting_date, pi.posting_time) AS posting_datetime,
+			pi.creation AS creation,
+			pii.item_code AS item_code,
+			pii.serial_no AS serial_no,
+			pii.serial_and_batch_bundle AS bundle,
+			pii.net_rate AS rate,
+			pii.mrp AS mrp
+		FROM `tabPurchase Invoice Item` pii
+		INNER JOIN `tabPurchase Invoice` pi ON pi.name = pii.parent
+		WHERE pi.docstatus = 1
+		AND (IFNULL(pii.serial_no, '') != '' OR IFNULL(pii.serial_and_batch_bundle, '') != '')
+	""", as_dict=True)
+
+	consignment_rows = frappe.db.sql("""
+		SELECT
+			se.name AS voucher_no,
+			'Consignment' AS entry_type,
+			1 AS is_inward,
+			TIMESTAMP(se.posting_date, se.posting_time) AS posting_datetime,
+			se.creation AS creation,
+			sed.item_code AS item_code,
+			sed.serial_no AS serial_no,
+			sed.serial_and_batch_bundle AS bundle,
+			sed.basic_rate AS rate,
+			sed.custom_mrp AS mrp
+		FROM `tabStock Entry Detail` sed
+		INNER JOIN `tabStock Entry` se ON se.name = sed.parent
+		WHERE se.docstatus = 1
+		AND se.stock_entry_type = 'Material Receipt'
+		AND se.type_of_stocks = 'Consignment'
+		AND (IFNULL(sed.serial_no, '') != '' OR IFNULL(sed.serial_and_batch_bundle, '') != '')
+	""", as_dict=True)
+
+	for row in purchase_rows + consignment_rows:
+		row_serials = {sn.strip().upper() for sn in (row.serial_no or "").split("\n") if sn.strip()}
+		row_serials.update(sn.upper() for sn in bundle_serials.get(row.bundle, []))
+
+		for key in row_serials:
+			serial_no = serials_by_key.get(key)
+			if serial_no and serial_no.item_code == row.item_code:
+				entries.setdefault(serial_no.name, []).append(row)
+
+	for serial_entries in entries.values():
+		serial_entries.sort(key=lambda entry: (entry.posting_datetime, entry.creation))
+
+	return entries
+
+
 def get_data(filters):
 	data = []
 
@@ -139,9 +218,28 @@ def get_data(filters):
 	# filtered on. Serials with no resolvable inward voucher fall back to
 	# creation so they are never silently dropped from the balance.
 	posting_date_map = get_posting_date_map([serial_no.name for serial_no in serial_nos])
+	serial_entries_map = get_serial_entries_map(serial_nos)
 
 	for serial_no in serial_nos:
-		serial_no.posting_date = posting_date_map.get(serial_no.name) or getdate(serial_no.creation)
+		entries = serial_entries_map.get(serial_no.name, [])
+
+		# Status, value and MRP follow the latest voucher by posting date: a
+		# Purchase Invoice makes the serial Paid, but a Debit Note followed by a
+		# fresh Consignment receipt hands it back to the supplier's stock.
+		serial_no.latest_entry = entries[-1] if entries else None
+		serial_no.latest_inward = next((entry for entry in reversed(entries) if entry.is_inward), None)
+		serial_no.latest_purchase = next((entry for entry in reversed(entries) if entry.entry_type == "Purchase"), None)
+
+		posting_date = posting_date_map.get(serial_no.name)
+
+		# The bundle replay misses a serial whose first receipt predates bundles
+		# and was then returned and received again, so a later inward voucher wins.
+		if serial_no.latest_inward:
+			inward_date = getdate(serial_no.latest_inward.posting_datetime)
+			if not posting_date or inward_date > posting_date:
+				posting_date = inward_date
+
+		serial_no.posting_date = posting_date or getdate(serial_no.creation)
 
 	if from_date and to_date:
 		serial_nos = [
@@ -156,7 +254,7 @@ def get_data(filters):
 
 	item_codes = [serial_no.item_code for serial_no in serial_nos]
 
-	item_details = frappe.db.get_all("Item", filters={"item_code": ["in", item_codes]}, fields=["name", "item_group", "stock_uom"])
+	item_details = frappe.db.get_all("Item", filters={"item_code": ["in", item_codes]}, fields=["name", "item_group", "stock_uom", "mrp"])
 	item_map = {item['name']: item for item in item_details}
 
 	for serial_no in serial_nos:
@@ -180,47 +278,28 @@ def get_data(filters):
 		# STATUS LOGIC
 		# -------------------------
 
-		# 1) PURCHASE INVOICE → PAID
-		# custom_purchase_invoice_no is stamped on the Serial No when a Purchase
-		# Invoice is submitted against it (see overrides/purchase_invoice.py),
-		# so no lookup into Purchase Invoice Item is needed.
-		purchase_invoice = serial_no.get("custom_purchase_invoice_no")
+		# The latest voucher by posting date decides: Purchase Invoice → Paid,
+		# Consignment Material Receipt → Consignment, Debit Note → returned, no status.
+		latest_entry = serial_no.latest_entry
 
-		if purchase_invoice:
+		if latest_entry and latest_entry.entry_type == "Purchase":
 			status = "Paid"
-
-		# 2) STOCK ENTRY → MATERIAL RECEIPT → CONSIGNMENT → PAID
-		if not status:
-			se_details = frappe.db.get_all(
-				"Stock Entry Detail",
-				filters={
-					"item_code": item_code,
-					"serial_no": ["like", f"%{sn}%"],
-				},
-				pluck="parent"
-			)
-
-			if se_details:
-				stock_entries = frappe.db.get_all(
-					"Stock Entry",
-					filters={
-						"name": ["in", se_details],
-						"docstatus": 1,
-						"stock_entry_type": "Material Receipt",
-						"type_of_stocks": "Consignment",
-					},
-					fields=["name"]
-				)
-
-				if stock_entries:
-					status = "Consignment"
+		elif latest_entry and latest_entry.entry_type == "Consignment":
+			status = "Consignment"
 
 		# -------------------------
 		# RATE & MRP LOGIC
 		# -------------------------
-		if doc_no:
 
-			# 1) STOCK ENTRY DETAIL (highest priority)
+		# 1) LATEST INWARD VOUCHER (highest priority) — the receipt that brought the
+		# serial into stock this time, not purchase_document_no, which still points
+		# at the first receipt after a return and a fresh receipt.
+		if serial_no.latest_inward:
+			purchase_rate = serial_no.latest_inward.rate or 0
+			mrp = serial_no.latest_inward.mrp or 0
+
+		elif doc_no:
+			# Inward through some other Stock Entry type (not Consignment)
 			row = frappe.db.get_value(
 				"Stock Entry Detail",
 				{
@@ -235,36 +314,23 @@ def get_data(filters):
 				purchase_rate = row.basic_rate or 0
 				mrp = row.custom_mrp or 0
 
-		# 2) PURCHASE INVOICE ITEM (only if still not found).
-		# Keyed on custom_purchase_invoice_no, not purchase_document_no — when the
-		# serial was received through a Stock Entry, purchase_document_no holds
-		# that Stock Entry and can never match a Purchase Invoice Item.
-		if not mrp and purchase_invoice:
-			row = frappe.db.get_value(
-				"Purchase Invoice Item",
-				{
-					"parent": purchase_invoice,
-					"item_code": item_code,
-				},
-				["net_rate", "mrp"],
-				as_dict=True
-			)
-			if row:
-				purchase_rate = row.net_rate or 0
-				mrp = row.mrp or 0
+		# 2) PURCHASE INVOICE ITEM (only if still not found, and only while Paid —
+		# a returned invoice no longer prices the serial)
+		if not mrp and status == "Paid" and serial_no.latest_purchase:
+			purchase_rate = serial_no.latest_purchase.rate or 0
+			mrp = serial_no.latest_purchase.mrp or 0
+
+		# Get item details from pre-fetched data
+		item_data = item_map.get(serial_no.item_code, {})
 
 		#3) FALLBACK — ITEM MASTER MRP
 		if not mrp:
-			mrp = frappe.db.get_value("Item", item_code, "mrp") or 0
+			mrp = item_data.get("mrp") or 0
 
 		#4) FINAL RATE FALLBACK
 		if not purchase_rate:
 			purchase_rate = serial_no.purchase_rate or 0
 
-
-		
-		# Get item details from pre-fetched data
-		item_data = item_map.get(serial_no.item_code, {})
 		item_group = item_data.get("item_group", "")
 		stock_uom = item_data.get("stock_uom", "")
 
