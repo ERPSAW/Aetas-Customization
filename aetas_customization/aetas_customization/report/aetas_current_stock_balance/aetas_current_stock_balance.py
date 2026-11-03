@@ -165,10 +165,10 @@ def get_serial_entries_map(serial_nos):
 		AND (IFNULL(pii.serial_no, '') != '' OR IFNULL(pii.serial_and_batch_bundle, '') != '')
 	""", as_dict=True)
 
-	consignment_rows = frappe.db.sql("""
+	receipt_rows = frappe.db.sql("""
 		SELECT
 			se.name AS voucher_no,
-			'Consignment' AS entry_type,
+			IF(se.type_of_stocks = 'Consignment', 'Consignment', 'Own Purchase') AS entry_type,
 			1 AS is_inward,
 			TIMESTAMP(se.posting_date, se.posting_time) AS posting_datetime,
 			se.creation AS creation,
@@ -181,11 +181,11 @@ def get_serial_entries_map(serial_nos):
 		INNER JOIN `tabStock Entry` se ON se.name = sed.parent
 		WHERE se.docstatus = 1
 		AND se.stock_entry_type = 'Material Receipt'
-		AND se.type_of_stocks = 'Consignment'
+		AND se.type_of_stocks IN ('Consignment', 'Own Purchase goods')
 		AND (IFNULL(sed.serial_no, '') != '' OR IFNULL(sed.serial_and_batch_bundle, '') != '')
 	""", as_dict=True)
 
-	for row in purchase_rows + consignment_rows:
+	for row in purchase_rows + receipt_rows:
 		row_serials = {sn.strip().upper() for sn in (row.serial_no or "").split("\n") if sn.strip()}
 		row_serials.update(sn.upper() for sn in bundle_serials.get(row.bundle, []))
 
@@ -254,7 +254,7 @@ def get_data(filters):
 
 	item_codes = [serial_no.item_code for serial_no in serial_nos]
 
-	item_details = frappe.db.get_all("Item", filters={"item_code": ["in", item_codes]}, fields=["name", "item_group", "stock_uom", "mrp"])
+	item_details = frappe.db.get_all("Item", filters={"item_code": ["in", item_codes]}, fields=["name", "item_group", "stock_uom", "mrp", "brand"])
 	item_map = {item['name']: item for item in item_details}
 
 	for serial_no in serial_nos:
@@ -278,11 +278,16 @@ def get_data(filters):
 		# STATUS LOGIC
 		# -------------------------
 
-		# The latest voucher by posting date decides: Purchase Invoice → Paid,
-		# Consignment Material Receipt → Consignment, Debit Note → returned, no status.
+		# MontBlanc stock is always Paid, whatever voucher brought it in.
+		# Otherwise the latest voucher by posting date decides: Purchase Invoice or
+		# Own Purchase Material Receipt → Paid, Consignment Material Receipt →
+		# Consignment, Debit Note → returned, no status.
 		latest_entry = serial_no.latest_entry
+		brand = (item_map.get(item_code, {}).get("brand") or "").lower()
 
-		if latest_entry and latest_entry.entry_type == "Purchase":
+		if brand == "montblanc":
+			status = "Paid"
+		elif latest_entry and latest_entry.entry_type in ("Purchase", "Own Purchase"):
 			status = "Paid"
 		elif latest_entry and latest_entry.entry_type == "Consignment":
 			status = "Consignment"
