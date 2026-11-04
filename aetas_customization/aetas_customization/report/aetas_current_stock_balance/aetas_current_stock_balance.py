@@ -209,7 +209,12 @@ def get_data(filters):
 	if from_date and to_date and from_date > to_date:
 		frappe.throw("From Date cannot be greater than To Date")
 
-	serial_nos = frappe.db.get_all("Serial No", filters={"status": "Active"}, fields=['*'], order_by="creation asc")
+	serial_no_filters = {"status": "Active"}
+
+	if filters.get("serial_no"):
+		serial_no_filters["name"] = filters.get("serial_no")
+
+	serial_nos = frappe.db.get_all("Serial No", filters=serial_no_filters, fields=['*'], order_by="creation asc")
 
 	if not serial_nos:
 		return data
