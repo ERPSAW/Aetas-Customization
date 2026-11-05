@@ -373,7 +373,8 @@ scheduler_events = {
         "aetas_customization.aetas_customization.api.razorpay_activity_log.cleanup_old_activity_logs"
     ],
     "hourly": [
-        "aetas_customization.aetas_customization.aot_data.check_and_send_dashboard_email"
+        "aetas_customization.aetas_customization.aot_data.check_and_send_dashboard_email",
+        "aetas_customization.aetas_customization.api.customer_info_mis.check_and_send_customer_info_mis"
     ]
 }
 

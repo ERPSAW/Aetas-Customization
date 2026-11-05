@@ -1,0 +1,91 @@
+{
+ "actions": [],
+ "creation": "2026-11-05 00:00:00",
+ "doctype": "DocType",
+ "document_type": "Setup",
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "send_time",
+  "column_break_main",
+  "email_subject",
+  "attachment_format",
+  "email_message_section",
+  "email_message",
+  "recipients_section",
+  "email_recipients"
+ ],
+ "fields": [
+  {
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "description": "The email goes every day within this hour.",
+   "fieldname": "send_time",
+   "fieldtype": "Time",
+   "label": "Send Time"
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "email_subject",
+   "fieldtype": "Data",
+   "label": "Email Subject"
+  },
+  {
+   "description": "The report is attached to the email in this format.",
+   "fieldname": "attachment_format",
+   "fieldtype": "Select",
+   "label": "Attachment Format",
+   "options": "\nCSV\nPDF"
+  },
+  {
+   "fieldname": "email_message_section",
+   "fieldtype": "Section Break",
+   "label": "Email Message"
+  },
+  {
+   "description": "This text is the email body. The report goes as an attachment.",
+   "fieldname": "email_message",
+   "fieldtype": "Text Editor",
+   "label": "Email Message"
+  },
+  {
+   "fieldname": "recipients_section",
+   "fieldtype": "Section Break",
+   "label": "Recipients"
+  },
+  {
+   "fieldname": "email_recipients",
+   "fieldtype": "Table",
+   "label": "Email Recipients",
+   "options": "AOT Email Recipient"
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-11-05 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Aetas Customization",
+ "name": "Customer Info MIS Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

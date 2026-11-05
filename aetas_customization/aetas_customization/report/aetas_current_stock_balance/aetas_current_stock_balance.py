@@ -11,7 +11,70 @@ def execute(filters=None):
 	return columns, data
 
 
-def get_posting_date_map(serial_names):
+def get_stock_as_on_map(as_on_date):
+	"""Return {SERIAL_NO: warehouse} for every serial in stock at the end of as_on_date.
+
+	Replays the Stock Ledger up to that day, the same source ERPNext's own Stock
+	Ledger report reads, so a serial sold after as_on_date still counts while one
+	sold on or before it does not. Keys are upper case because the legacy serial_no
+	text field is free text and MariaDB matched it case-insensitively.
+
+	A serial sits on a ledger row in one of two ways, never both: entries posted
+	before Serial and Batch Bundles carry the serial in the plain serial_no text
+	field, later ones through the bundle. Each serial moves one unit, in the
+	direction of actual_qty.
+
+	A Material Transfer posts an outward and an inward row at the same moment; they
+	net to zero, and the warehouse is taken from the inward side.
+	"""
+
+	moves = []
+
+	for row in frappe.db.sql("""
+		SELECT
+			sbe.serial_no AS serial_no,
+			sle.warehouse AS warehouse,
+			sle.actual_qty AS actual_qty,
+			TIMESTAMP(sle.posting_date, sle.posting_time) AS posting_datetime,
+			sle.creation AS creation
+		FROM `tabStock Ledger Entry` sle
+		INNER JOIN `tabSerial and Batch Entry` sbe ON sbe.parent = sle.serial_and_batch_bundle
+		WHERE sle.is_cancelled = 0
+		AND sle.posting_date <= %(as_on_date)s
+		AND IFNULL(sle.serial_and_batch_bundle, '') != ''
+		AND sle.actual_qty != 0
+	""", {"as_on_date": as_on_date}, as_dict=True):
+		moves.append((row.posting_datetime, row.creation, row.serial_no.upper(), row.actual_qty, row.warehouse))
+
+	for row in frappe.db.sql("""
+		SELECT
+			serial_no AS serial_nos,
+			warehouse,
+			actual_qty,
+			TIMESTAMP(posting_date, posting_time) AS posting_datetime,
+			creation
+		FROM `tabStock Ledger Entry`
+		WHERE is_cancelled = 0
+		AND posting_date <= %(as_on_date)s
+		AND IFNULL(serial_no, '') != ''
+		AND actual_qty != 0
+	""", {"as_on_date": as_on_date}, as_dict=True):
+		for sn in row.serial_nos.split("\n"):
+			if sn.strip():
+				moves.append((row.posting_datetime, row.creation, sn.strip().upper(), row.actual_qty, row.warehouse))
+
+	moves.sort(key=lambda move: (move[0], move[1]))
+
+	qty, warehouses = {}, {}
+	for _posting_datetime, _creation, sn, actual_qty, warehouse in moves:
+		qty[sn] = qty.get(sn, 0) + (1 if actual_qty > 0 else -1)
+		if actual_qty > 0:
+			warehouses[sn] = warehouse
+
+	return {sn: warehouses.get(sn) for sn, balance in qty.items() if balance > 0}
+
+
+def get_posting_date_map(serial_names, as_on_date=None):
 	"""Return {serial_no: posting_date} for the start of each serial's current stint in stock.
 
 	The posting date comes from the Serial and Batch Bundle, whose posting_datetime
@@ -30,12 +93,18 @@ def get_posting_date_map(serial_names):
 	erpnext/stock/doctype/stock_entry/stock_entry.py) — both stamped with the same
 	posting_datetime. Summed together they net to zero, the running qty never dips,
 	and the serial keeps ageing from its original receipt.
+
+	With as_on_date, movements after that day are ignored, so the stint is the one
+	the serial was in on that day.
 	"""
 
 	posting_dates = {}
 
 	if not serial_names:
 		return posting_dates
+
+	bundle_condition = "AND DATE(sbb.posting_datetime) <= %(as_on_date)s" if as_on_date else ""
+	legacy_condition = "AND parent.posting_date <= %(as_on_date)s" if as_on_date else ""
 
 	# 1) Serial and Batch Bundle (ERPNext v15 default)
 	bundle_rows = frappe.db.sql("""
@@ -51,6 +120,7 @@ def get_posting_date_map(serial_names):
 			AND sbb.is_cancelled = 0
 			AND sbb.type_of_transaction IN ('Inward', 'Outward')
 			AND sbb.posting_datetime IS NOT NULL
+			{bundle_condition}
 			GROUP BY sbe.serial_no, sbb.posting_datetime
 		),
 		walk AS (
@@ -71,7 +141,7 @@ def get_posting_date_map(serial_names):
 		FROM walk
 		WHERE qty_after > 0 AND qty_before <= 0
 		GROUP BY serial_no
-	""", {"serial_names": serial_names}, as_dict=True)
+	""".format(bundle_condition=bundle_condition), {"serial_names": serial_names, "as_on_date": as_on_date}, as_dict=True)
 
 	for row in bundle_rows:
 		posting_dates[row.serial_no] = getdate(row.posting_datetime)
@@ -98,7 +168,8 @@ def get_posting_date_map(serial_names):
 				WHERE child.docstatus = 1
 				AND child.serial_no IS NOT NULL
 				AND child.serial_no != ''
-			""".format(child_dt=child_dt, parent_dt=parent_dt), as_dict=True)
+				{legacy_condition}
+			""".format(child_dt=child_dt, parent_dt=parent_dt, legacy_condition=legacy_condition), {"as_on_date": as_on_date}, as_dict=True)
 
 			missing_set = set(missing)
 
@@ -121,9 +192,10 @@ def get_posting_date_map(serial_names):
 	return posting_dates
 
 
-def get_serial_entries_map(serial_nos):
+def get_serial_entries_map(serial_nos, as_on_date=None):
 	"""Return {serial_no: [entry, ...]} for every Purchase Invoice, Debit Note and
-	Consignment Material Receipt the serial appears on, oldest first.
+	Consignment Material Receipt the serial appears on, oldest first. With
+	as_on_date, vouchers posted after that day are left out.
 
 	Entries are ordered by the voucher's own posting_date/posting_time, so a
 	backdated document sits where it happened, not where it was keyed in.
@@ -163,7 +235,9 @@ def get_serial_entries_map(serial_nos):
 		INNER JOIN `tabPurchase Invoice` pi ON pi.name = pii.parent
 		WHERE pi.docstatus = 1
 		AND (IFNULL(pii.serial_no, '') != '' OR IFNULL(pii.serial_and_batch_bundle, '') != '')
-	""", as_dict=True)
+		{as_on_condition}
+	""".format(as_on_condition="AND pi.posting_date <= %(as_on_date)s" if as_on_date else ""),
+		{"as_on_date": as_on_date}, as_dict=True)
 
 	receipt_rows = frappe.db.sql("""
 		SELECT
@@ -183,7 +257,9 @@ def get_serial_entries_map(serial_nos):
 		AND se.stock_entry_type = 'Material Receipt'
 		AND se.type_of_stocks IN ('Consignment', 'Own Purchase goods')
 		AND (IFNULL(sed.serial_no, '') != '' OR IFNULL(sed.serial_and_batch_bundle, '') != '')
-	""", as_dict=True)
+		{as_on_condition}
+	""".format(as_on_condition="AND se.posting_date <= %(as_on_date)s" if as_on_date else ""),
+		{"as_on_date": as_on_date}, as_dict=True)
 
 	for row in purchase_rows + receipt_rows:
 		row_serials = {sn.strip().upper() for sn in (row.serial_no or "").split("\n") if sn.strip()}
@@ -203,27 +279,40 @@ def get_serial_entries_map(serial_nos):
 def get_data(filters):
 	data = []
 
-	from_date = filters.get("from_date")
-	to_date = filters.get("to_date")
+	# With an As On Date the report shows the stock on hand at the end of that day,
+	# whatever the serial's status is today; without one, the stock on hand now.
+	as_on_date = filters.get("as_on_date")
+	serial_no_filters = {}
 
-	if from_date and to_date and from_date > to_date:
-		frappe.throw("From Date cannot be greater than To Date")
+	if as_on_date:
+		stock_as_on_map = get_stock_as_on_map(as_on_date)
 
-	serial_no_filters = {"status": "Active"}
+		if not stock_as_on_map:
+			return data
+
+		serial_no_filters["name"] = ["in", list(stock_as_on_map)]
+	else:
+		serial_no_filters["status"] = "Active"
 
 	if filters.get("serial_no"):
 		serial_no_filters["name"] = filters.get("serial_no")
 
 	serial_nos = frappe.db.get_all("Serial No", filters=serial_no_filters, fields=['*'], order_by="creation asc")
 
+	if as_on_date:
+		# The Serial No master only knows where the serial is today
+		serial_nos = [serial_no for serial_no in serial_nos if serial_no.name.upper() in stock_as_on_map]
+		for serial_no in serial_nos:
+			serial_no.warehouse = stock_as_on_map[serial_no.name.upper()]
+
 	if not serial_nos:
 		return data
 
-	# Posting date drives this report — both the date shown and the date range
-	# filtered on. Serials with no resolvable inward voucher fall back to
-	# creation so they are never silently dropped from the balance.
-	posting_date_map = get_posting_date_map([serial_no.name for serial_no in serial_nos])
-	serial_entries_map = get_serial_entries_map(serial_nos)
+	# Posting date is the day the serial last came into stock. Serials with no
+	# resolvable inward voucher fall back to creation so they are never silently
+	# dropped from the balance.
+	posting_date_map = get_posting_date_map([serial_no.name for serial_no in serial_nos], as_on_date)
+	serial_entries_map = get_serial_entries_map(serial_nos, as_on_date)
 
 	for serial_no in serial_nos:
 		entries = serial_entries_map.get(serial_no.name, [])
@@ -245,15 +334,6 @@ def get_data(filters):
 				posting_date = inward_date
 
 		serial_no.posting_date = posting_date or getdate(serial_no.creation)
-
-	if from_date and to_date:
-		serial_nos = [
-			serial_no for serial_no in serial_nos
-			if getdate(from_date) <= serial_no.posting_date <= getdate(to_date)
-		]
-
-		if not serial_nos:
-			return data
 
 	serial_nos.sort(key=lambda serial_no: serial_no.posting_date, reverse=True)
 
@@ -345,10 +425,10 @@ def get_data(filters):
 		stock_uom = item_data.get("stock_uom", "")
 
 		# Calculate stock age from the posting date, so backdated receipts age
-		# from when the stock actually arrived
+		# from when the stock actually arrived, up to the As On Date when given
 		posting_date = serial_no.posting_date
-		today_date = datetime.strptime(frappe.utils.today(), '%Y-%m-%d').date()
-		stock_age = (today_date - posting_date).days
+		age_until = getdate(as_on_date) if as_on_date else datetime.strptime(frappe.utils.today(), '%Y-%m-%d').date()
+		stock_age = (age_until - posting_date).days
 
 		# Build the row for each serial number
 		row = {
