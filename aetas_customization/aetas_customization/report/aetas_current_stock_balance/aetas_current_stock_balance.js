@@ -5,8 +5,14 @@
 frappe.query_reports["Aetas Current Stock Balance"] = {
 	"filters": [
 		{
-			"fieldname":"as_on_date",
-			"label": __("As On Date"),
+			"fieldname":"from_date",
+			"label": __("From Date"),
+			"fieldtype": "Date",
+			"width": "60px"
+		},
+		{
+			"fieldname":"to_date",
+			"label": __("To Date"),
 			"fieldtype": "Date",
 			"width": "60px"
 		},
@@ -22,7 +28,8 @@ frappe.query_reports["Aetas Current Stock Balance"] = {
 	onload: function(report) {
 		report.page.add_inner_button(__("Clear Filter"), function() {
 			report.set_filter_value({
-				as_on_date: "",
+				from_date: "",
+				to_date: "",
 				serial_no: ""
 			});
 		});

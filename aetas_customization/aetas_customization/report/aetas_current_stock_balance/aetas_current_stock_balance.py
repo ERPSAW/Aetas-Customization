@@ -11,13 +11,18 @@ def execute(filters=None):
 	return columns, data
 
 
-def get_stock_as_on_map(as_on_date):
-	"""Return {SERIAL_NO: warehouse} for every serial in stock at the end of as_on_date.
+def get_stock_in_range_map(from_date, to_date):
+	"""Return {SERIAL_NO: {"warehouse", "in_stock_until"}} for every serial that was in
+	stock on at least one day from from_date to to_date.
 
-	Replays the Stock Ledger up to that day, the same source ERPNext's own Stock
-	Ledger report reads, so a serial sold after as_on_date still counts while one
-	sold on or before it does not. Keys are upper case because the legacy serial_no
-	text field is free text and MariaDB matched it case-insensitively.
+	Replays the Stock Ledger up to to_date, the same source ERPNext's own Stock
+	Ledger report reads. A serial counts when it was in stock as the range opened,
+	or came in during it — so one sold after to_date counts, and so does one bought
+	and sold inside the range. Keys are upper case because the legacy serial_no text
+	field is free text and MariaDB matched it case-insensitively.
+
+	warehouse is where the serial last landed; in_stock_until is to_date when it is
+	still in stock then, else the day it last went out, so its age stops there.
 
 	A serial sits on a ledger row in one of two ways, never both: entries posted
 	before Serial and Batch Bundles carry the serial in the plain serial_no text
@@ -40,10 +45,10 @@ def get_stock_as_on_map(as_on_date):
 		FROM `tabStock Ledger Entry` sle
 		INNER JOIN `tabSerial and Batch Entry` sbe ON sbe.parent = sle.serial_and_batch_bundle
 		WHERE sle.is_cancelled = 0
-		AND sle.posting_date <= %(as_on_date)s
+		AND sle.posting_date <= %(to_date)s
 		AND IFNULL(sle.serial_and_batch_bundle, '') != ''
 		AND sle.actual_qty != 0
-	""", {"as_on_date": as_on_date}, as_dict=True):
+	""", {"to_date": to_date}, as_dict=True):
 		moves.append((row.posting_datetime, row.creation, row.serial_no.upper(), row.actual_qty, row.warehouse))
 
 	for row in frappe.db.sql("""
@@ -55,23 +60,43 @@ def get_stock_as_on_map(as_on_date):
 			creation
 		FROM `tabStock Ledger Entry`
 		WHERE is_cancelled = 0
-		AND posting_date <= %(as_on_date)s
+		AND posting_date <= %(to_date)s
 		AND IFNULL(serial_no, '') != ''
 		AND actual_qty != 0
-	""", {"as_on_date": as_on_date}, as_dict=True):
+	""", {"to_date": to_date}, as_dict=True):
 		for sn in row.serial_nos.split("\n"):
 			if sn.strip():
 				moves.append((row.posting_datetime, row.creation, sn.strip().upper(), row.actual_qty, row.warehouse))
 
 	moves.sort(key=lambda move: (move[0], move[1]))
 
-	qty, warehouses = {}, {}
-	for _posting_datetime, _creation, sn, actual_qty, warehouse in moves:
-		qty[sn] = qty.get(sn, 0) + (1 if actual_qty > 0 else -1)
+	from_date, to_date = getdate(from_date), getdate(to_date)
+	qty, warehouses, last_move_dates, in_range = {}, {}, {}, set()
+
+	for posting_datetime, _creation, sn, actual_qty, warehouse in moves:
+		move_date = getdate(posting_datetime)
+		qty_before = qty.get(sn, 0)
+		qty[sn] = qty_before + (1 if actual_qty > 0 else -1)
+		last_move_dates[sn] = move_date
+
 		if actual_qty > 0:
 			warehouses[sn] = warehouse
 
-	return {sn: warehouses.get(sn) for sn, balance in qty.items() if balance > 0}
+		# In stock as this in-range day began, or after this move
+		if move_date >= from_date and (qty_before > 0 or qty[sn] > 0):
+			in_range.add(sn)
+
+	stock = {}
+	for sn, balance in qty.items():
+		# Still in stock at the end: it was in stock through the whole range
+		if balance > 0 or sn in in_range:
+			stock[sn] = frappe._dict(
+				warehouse=warehouses.get(sn),
+				in_stock_until=to_date if balance > 0 else last_move_dates[sn],
+				left_stock=balance <= 0,
+			)
+
+	return stock
 
 
 def get_posting_date_map(serial_names, as_on_date=None):
@@ -223,7 +248,7 @@ def get_serial_entries_map(serial_nos, as_on_date=None):
 		SELECT
 			pi.name AS voucher_no,
 			IF(pi.is_return = 1, 'Return', 'Purchase') AS entry_type,
-			pi.update_stock AS is_inward,
+			IF(pi.is_return = 1, 0, pi.update_stock) AS is_inward,
 			TIMESTAMP(pi.posting_date, pi.posting_time) AS posting_datetime,
 			pi.creation AS creation,
 			pii.item_code AS item_code,
@@ -279,18 +304,32 @@ def get_serial_entries_map(serial_nos, as_on_date=None):
 def get_data(filters):
 	data = []
 
-	# With an As On Date the report shows the stock on hand at the end of that day,
-	# whatever the serial's status is today; without one, the stock on hand now.
-	as_on_date = filters.get("as_on_date")
+	# With a date range the report shows every serial that was in stock on at least
+	# one day of it, whatever the serial's status is today; without one, the stock
+	# on hand now. A single date is read as a one-day range, and To Date alone runs
+	# to today.
+	from_date = filters.get("from_date")
+	to_date = filters.get("to_date")
+
+	if from_date and to_date and getdate(from_date) > getdate(to_date):
+		frappe.throw("From Date cannot be greater than To Date")
+
+	if from_date and not to_date:
+		to_date = frappe.utils.today()
+	elif to_date and not from_date:
+		from_date = to_date
+
+	# Status, value and dates are read as they stood on To Date
+	as_on_date = to_date
 	serial_no_filters = {}
 
-	if as_on_date:
-		stock_as_on_map = get_stock_as_on_map(as_on_date)
+	if to_date:
+		stock_in_range_map = get_stock_in_range_map(from_date, to_date)
 
-		if not stock_as_on_map:
+		if not stock_in_range_map:
 			return data
 
-		serial_no_filters["name"] = ["in", list(stock_as_on_map)]
+		serial_no_filters["name"] = ["in", list(stock_in_range_map)]
 	else:
 		serial_no_filters["status"] = "Active"
 
@@ -299,11 +338,14 @@ def get_data(filters):
 
 	serial_nos = frappe.db.get_all("Serial No", filters=serial_no_filters, fields=['*'], order_by="creation asc")
 
-	if as_on_date:
+	if to_date:
 		# The Serial No master only knows where the serial is today
-		serial_nos = [serial_no for serial_no in serial_nos if serial_no.name.upper() in stock_as_on_map]
+		serial_nos = [serial_no for serial_no in serial_nos if serial_no.name.upper() in stock_in_range_map]
 		for serial_no in serial_nos:
-			serial_no.warehouse = stock_as_on_map[serial_no.name.upper()]
+			stock = stock_in_range_map[serial_no.name.upper()]
+			serial_no.warehouse = stock.warehouse
+			serial_no.in_stock_until = stock.in_stock_until
+			serial_no.left_stock = stock.left_stock
 
 	if not serial_nos:
 		return data
@@ -316,6 +358,14 @@ def get_data(filters):
 
 	for serial_no in serial_nos:
 		entries = serial_entries_map.get(serial_no.name, [])
+
+		# A serial that left stock inside the range is shown as it was while still
+		# in stock: the Debit Note that sent it back, and anything after, is skipped.
+		if serial_no.left_stock:
+			entries = [
+				entry for entry in entries
+				if entry.entry_type != "Return" and getdate(entry.posting_datetime) <= serial_no.in_stock_until
+			]
 
 		# Status, value and MRP follow the latest voucher by posting date: a
 		# Purchase Invoice makes the serial Paid, but a Debit Note followed by a
@@ -425,9 +475,10 @@ def get_data(filters):
 		stock_uom = item_data.get("stock_uom", "")
 
 		# Calculate stock age from the posting date, so backdated receipts age
-		# from when the stock actually arrived, up to the As On Date when given
+		# from when the stock actually arrived, up to the end of the range or the
+		# day the serial left stock inside it
 		posting_date = serial_no.posting_date
-		age_until = getdate(as_on_date) if as_on_date else datetime.strptime(frappe.utils.today(), '%Y-%m-%d').date()
+		age_until = serial_no.in_stock_until or datetime.strptime(frappe.utils.today(), '%Y-%m-%d').date()
 		stock_age = (age_until - posting_date).days
 
 		# Build the row for each serial number
