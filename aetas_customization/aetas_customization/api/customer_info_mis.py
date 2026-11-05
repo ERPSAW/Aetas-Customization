@@ -14,8 +14,8 @@ SENT_CACHE_EXPIRY_SEC = 90000  # 25 h, clears before the next day's window
 # Attachment Format option -> (Auto Email Report format, file extension)
 FORMATS = {
 	"CSV": ("CSV", "csv"),
-	"PDF": ("PDF", "pdf"),
 }
+
 
 
 def check_and_send_customer_info_mis():
@@ -72,7 +72,7 @@ def send_mail(settings):
 
 
 def build_attachment(settings, subject):
-	"""Reuse Frappe's Auto Email Report code to build the CSV or PDF file."""
+	"""Reuse Frappe's Auto Email Report code to build the attachment file."""
 	report_format, extension = FORMATS[settings.attachment_format]
 	report = frappe.get_doc(
 		{

@@ -41,7 +41,7 @@
    "fieldname": "attachment_format",
    "fieldtype": "Select",
    "label": "Attachment Format",
-   "options": "\nCSV\nPDF"
+   "options": "\nCSV"
   },
   {
    "fieldname": "email_message_section",
